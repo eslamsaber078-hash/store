@@ -8,63 +8,100 @@ const multer = require('multer');
 const fs = require('fs');
 const cloudinary = require('cloudinary').v2;
 
-// Load local .env file variables if present (zero-dependency helper)
-if (fs.existsSync(path.join(__dirname, '.env'))) {
-    const envContent = fs.readFileSync(path.join(__dirname, '.env'), 'utf8');
+// Load local .env file variables if present (does NOT override real env vars on Render)
+const envPath = path.join(__dirname, '.env');
+if (fs.existsSync(envPath)) {
+    const envContent = fs.readFileSync(envPath, 'utf8');
     envContent.split(/\r?\n/).forEach(line => {
-        const parts = line.split('=');
-        if (parts.length >= 2) {
-            const key = parts[0].trim();
-            const val = parts.slice(1).join('=').trim();
-            process.env[key] = val;
+        const eqIdx = line.indexOf('=');
+        if (eqIdx > 0) {
+            const key = line.slice(0, eqIdx).trim();
+            const val = line.slice(eqIdx + 1).trim();
+            if (key && !process.env[key]) {   // never override Render env vars
+                process.env[key] = val;
+            }
         }
     });
+    console.log('[ENV] Loaded .env from', envPath);
 }
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const SECRET_KEY = 'davinci_store_secret_2026';
 
-// Configure Cloudinary
-cloudinary.config({
-    cloudinary_url: process.env.CLOUDINARY_URL
-});
+// ─── Configure Cloudinary ─────────────────────────────────────────────────
+// Supports two styles:
+//   Style A (Render):  CLOUDINARY_URL=cloudinary://API_KEY:API_SECRET@CLOUD_NAME
+//   Style B (manual):  CLOUDINARY_CLOUD_NAME + CLOUDINARY_API_KEY + CLOUDINARY_API_SECRET
+let cloudinaryReady = false;
 
-// Helper function to stream upload image file buffer to Cloudinary
-const uploadToCloudinary = (fileBuffer) => {
+if (process.env.CLOUDINARY_URL) {
+    try {
+        // Parse the URL manually — avoids SDK version quirks
+        const cUrl = process.env.CLOUDINARY_URL.replace('cloudinary://', 'http://');
+        const parsed = new URL(cUrl);
+        cloudinary.config({
+            cloud_name: parsed.hostname,
+            api_key:    parsed.username,
+            api_secret: decodeURIComponent(parsed.password),
+            secure:     true
+        });
+        cloudinaryReady = true;
+        console.log(`[Cloudinary] Configured via CLOUDINARY_URL — cloud: ${parsed.hostname}`);
+    } catch (e) {
+        console.error('[Cloudinary] Failed to parse CLOUDINARY_URL:', e.message);
+    }
+} else if (
+    process.env.CLOUDINARY_CLOUD_NAME &&
+    process.env.CLOUDINARY_API_KEY &&
+    process.env.CLOUDINARY_API_SECRET
+) {
+    cloudinary.config({
+        cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+        api_key:    process.env.CLOUDINARY_API_KEY,
+        api_secret: process.env.CLOUDINARY_API_SECRET,
+        secure:     true
+    });
+    cloudinaryReady = true;
+    console.log(`[Cloudinary] Configured via separate env vars — cloud: ${process.env.CLOUDINARY_CLOUD_NAME}`);
+} else {
+    console.warn('[Cloudinary] NO credentials found — images stored locally (ephemeral on Render!).');
+    console.warn('[Cloudinary] Add CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET to Render env vars.');
+}
+
+// ─── Upload helper ─────────────────────────────────────────────────────────
+const uploadToCloudinary = (fileBuffer, mimetype) => {
     return new Promise((resolve, reject) => {
-        const uploadStream = cloudinary.uploader.upload_stream(
-            { folder: 'davinci_products' },
-            (error, result) => {
-                if (error) return reject(error);
-                resolve(result.secure_url);
+        const opts = { folder: 'davinci_products', resource_type: 'image' };
+        const stream = cloudinary.uploader.upload_stream(opts, (error, result) => {
+            if (error) {
+                console.error('[Cloudinary] Upload failed:', JSON.stringify(error));
+                return reject(error);
             }
-        );
-        uploadStream.end(fileBuffer);
+            console.log('[Cloudinary] Uploaded OK:', result.secure_url);
+            resolve(result.secure_url);
+        });
+        stream.end(fileBuffer);
     });
 };
 
-// Hybrid image upload: falls back to local uploads/ directory if CLOUDINARY_URL is missing
 const uploadImage = async (file) => {
-    if (process.env.CLOUDINARY_URL) {
-        return await uploadToCloudinary(file.buffer);
-    } else {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        const filename = file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname);
-        const localPath = path.join(__dirname, 'uploads', filename);
-        
-        if (!fs.existsSync(path.dirname(localPath))) {
-            fs.mkdirSync(path.dirname(localPath), { recursive: true });
-        }
-        
-        fs.writeFileSync(localPath, file.buffer);
-        return `/uploads/${filename}`;
+    if (cloudinaryReady) {
+        return await uploadToCloudinary(file.buffer, file.mimetype);
     }
+    // Local fallback (images lost on Render redeploy)
+    const suffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+    const ext = path.extname(file.originalname) || '.jpg';
+    const filename = 'img-' + suffix + ext;
+    const dir = path.join(__dirname, 'uploads');
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, filename), file.buffer);
+    return `/uploads/${filename}`;
 };
 
-// Multer Memory Storage Configuration
+// ─── Multer: memory storage, 10 MB limit ──────────────────────────────────
 const storage = multer.memoryStorage();
-const upload = multer({ storage: storage });
+const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } });
 
 // Middleware
 app.use(cors());
