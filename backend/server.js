@@ -6,26 +6,46 @@ const db = require('./database');
 const path = require('path');
 const multer = require('multer');
 const fs = require('fs');
+const cloudinary = require('cloudinary').v2;
+
+// Load local .env file variables if present (zero-dependency helper)
+if (fs.existsSync(path.join(__dirname, '.env'))) {
+    const envContent = fs.readFileSync(path.join(__dirname, '.env'), 'utf8');
+    envContent.split(/\r?\n/).forEach(line => {
+        const parts = line.split('=');
+        if (parts.length >= 2) {
+            const key = parts[0].trim();
+            const val = parts.slice(1).join('=').trim();
+            process.env[key] = val;
+        }
+    });
+}
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const SECRET_KEY = 'davinci_store_secret_2026';
 
-// Multer Storage Configuration
-const uploadsDir = path.join(__dirname, 'uploads');
-if (!fs.existsSync(uploadsDir)) {
-    fs.mkdirSync(uploadsDir);
-}
-
-const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        cb(null, uploadsDir);
-    },
-    filename: function (req, file, cb) {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
-    }
+// Configure Cloudinary
+cloudinary.config({
+    cloudinary_url: process.env.CLOUDINARY_URL
 });
+
+// Helper function to stream upload image file buffer to Cloudinary
+const uploadToCloudinary = (fileBuffer) => {
+    return new Promise((resolve, reject) => {
+        const uploadStream = cloudinary.uploader.upload_stream(
+            { folder: 'davinci_products' },
+            (error, result) => {
+                if (error) return reject(error);
+                resolve(result.secure_url);
+            }
+        );
+        uploadStream.end(fileBuffer);
+    });
+};
+
+// Multer Memory Storage Configuration
+const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
 
 // Middleware
@@ -203,12 +223,18 @@ app.get('/api/products', (req, res) => {
     });
 });
 
-app.post('/api/products', authenticateToken, isAdmin, upload.array('imagesFiles', 10), (req, res) => {
+app.post('/api/products', authenticateToken, isAdmin, upload.array('imagesFiles', 10), async (req, res) => {
     const { name, category, categoryName, price, oldPrice, description, sizes, colors, inStock, featured } = req.body;
     
     let uploadedImages = [];
-    if (req.files && req.files.length > 0) {
-        uploadedImages = req.files.map(file => `/uploads/${file.filename}`);
+    try {
+        if (req.files && req.files.length > 0) {
+            const uploadPromises = req.files.map(file => uploadToCloudinary(file.buffer));
+            uploadedImages = await Promise.all(uploadPromises);
+        }
+    } catch (uploadError) {
+        console.error("Cloudinary upload error:", uploadError);
+        return res.status(500).json({ error: "فشل رفع الصور إلى السيرفر السحابي Cloudinary" });
     }
     
     let finalImages = [...uploadedImages];
@@ -237,12 +263,18 @@ app.post('/api/products', authenticateToken, isAdmin, upload.array('imagesFiles'
     });
 });
 
-app.put('/api/products/:id', authenticateToken, isAdmin, upload.array('imagesFiles', 10), (req, res) => {
+app.put('/api/products/:id', authenticateToken, isAdmin, upload.array('imagesFiles', 10), async (req, res) => {
     const { name, category, categoryName, price, oldPrice, description, sizes, colors, inStock, featured, existingImages } = req.body;
     
     let uploadedImages = [];
-    if (req.files && req.files.length > 0) {
-        uploadedImages = req.files.map(file => `/uploads/${file.filename}`);
+    try {
+        if (req.files && req.files.length > 0) {
+            const uploadPromises = req.files.map(file => uploadToCloudinary(file.buffer));
+            uploadedImages = await Promise.all(uploadPromises);
+        }
+    } catch (uploadError) {
+        console.error("Cloudinary upload error:", uploadError);
+        return res.status(500).json({ error: "فشل رفع الصور إلى السيرفر السحابي Cloudinary" });
     }
     
     let finalImages = [];
