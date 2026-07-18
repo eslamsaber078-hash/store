@@ -186,6 +186,14 @@ function initDb() {
         featured INTEGER DEFAULT 0
     )`, (err) => {
         if (err) return;
+        
+        // Ensure older DB instances created in previous sessions get the new snake_case columns if they don't exist
+        db.run("ALTER TABLE products ADD COLUMN category_name TEXT", () => {});
+        db.run("ALTER TABLE products ADD COLUMN old_price REAL", () => {});
+        db.run("ALTER TABLE products ADD COLUMN reviews_count INTEGER", () => {});
+        db.run("ALTER TABLE products ADD COLUMN in_stock INTEGER DEFAULT 1", () => {});
+        db.run("ALTER TABLE products ADD COLUMN featured INTEGER DEFAULT 0", () => {});
+
         db.get("SELECT COUNT(*) as count FROM products", [], (err, row) => {
             if (!row || row.count !== 0) return;
             try {

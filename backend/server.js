@@ -195,8 +195,8 @@ app.get('/api/products', (req, res) => {
                 description:  r.description,
                 sizes:        JSON.parse(r.sizes  || '[]'),
                 colors:       JSON.parse(r.colors || '[]'),
-                inStock:      r.in_stock  === 1,
-                featured:     r.featured  === 1
+                inStock:      r.in_stock === 1 || r.in_stock === true || r.in_stock === 'true',
+                featured:     r.featured === 1 || r.featured === true || r.featured === 'true'
             };
         });
         res.json(products);
