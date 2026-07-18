@@ -176,24 +176,27 @@ app.get('/api/products', (req, res) => {
     db.all("SELECT * FROM products", [], (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });
         
-        // Parse JSON strings back to objects
+        // Parse JSON strings back to objects + normalise column names to camelCase for frontend
         const products = rows.map(r => {
             let images = [];
-            try {
-                images = JSON.parse(r.images || '[]');
-            } catch(e) {
-                images = [];
-            }
-            if (images.length === 0 && r.image) {
-                images = [r.image];
-            }
+            try { images = JSON.parse(r.images || '[]'); } catch(e) { images = []; }
+            if (images.length === 0 && r.image) images = [r.image];
             return {
-                ...r,
-                sizes: JSON.parse(r.sizes || '[]'),
-                colors: JSON.parse(r.colors || '[]'),
-                images: images,
-                inStock: r.inStock === 1,
-                featured: r.featured === 1
+                id:           r.id,
+                name:         r.name,
+                category:     r.category,
+                categoryName: r.category_name,
+                price:        r.price,
+                oldPrice:     r.old_price,
+                rating:       r.rating,
+                reviewsCount: r.reviews_count,
+                image:        r.image,
+                images:       images,
+                description:  r.description,
+                sizes:        JSON.parse(r.sizes  || '[]'),
+                colors:       JSON.parse(r.colors || '[]'),
+                inStock:      r.in_stock  === 1,
+                featured:     r.featured  === 1
             };
         });
         res.json(products);
@@ -212,7 +215,7 @@ app.post('/api/products', authenticateToken, isAdmin, upload.array('imagesFiles'
     const mainImage = finalImages[0] || '';
     
     db.run(`INSERT INTO products 
-        (name, category, categoryName, price, oldPrice, rating, reviewsCount, image, images, description, sizes, colors, inStock, featured)
+        (name, category, category_name, price, old_price, rating, reviews_count, image, images, description, sizes, colors, in_stock, featured)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
         name, 
         category, 
@@ -255,7 +258,7 @@ app.put('/api/products/:id', authenticateToken, isAdmin, upload.array('imagesFil
     const mainImage = finalImages[0] || '';
     
     db.run(`UPDATE products SET 
-        name = ?, category = ?, categoryName = ?, price = ?, oldPrice = ?, image = ?, images = ?, description = ?, sizes = ?, colors = ?, inStock = ?, featured = ?
+        name = ?, category = ?, category_name = ?, price = ?, old_price = ?, image = ?, images = ?, description = ?, sizes = ?, colors = ?, in_stock = ?, featured = ?
         WHERE id = ?`, [
         name, 
         category, 
