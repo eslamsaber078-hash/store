@@ -44,6 +44,24 @@ const uploadToCloudinary = (fileBuffer) => {
     });
 };
 
+// Hybrid image upload: falls back to local uploads/ directory if CLOUDINARY_URL is missing
+const uploadImage = async (file) => {
+    if (process.env.CLOUDINARY_URL) {
+        return await uploadToCloudinary(file.buffer);
+    } else {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        const filename = file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname);
+        const localPath = path.join(__dirname, 'uploads', filename);
+        
+        if (!fs.existsSync(path.dirname(localPath))) {
+            fs.mkdirSync(path.dirname(localPath), { recursive: true });
+        }
+        
+        fs.writeFileSync(localPath, file.buffer);
+        return `/uploads/${filename}`;
+    }
+};
+
 // Multer Memory Storage Configuration
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
@@ -229,12 +247,12 @@ app.post('/api/products', authenticateToken, isAdmin, upload.array('imagesFiles'
     let uploadedImages = [];
     try {
         if (req.files && req.files.length > 0) {
-            const uploadPromises = req.files.map(file => uploadToCloudinary(file.buffer));
+            const uploadPromises = req.files.map(file => uploadImage(file));
             uploadedImages = await Promise.all(uploadPromises);
         }
     } catch (uploadError) {
-        console.error("Cloudinary upload error:", uploadError);
-        return res.status(500).json({ error: "فشل رفع الصور إلى السيرفر السحابي Cloudinary" });
+        console.error("Image upload error:", uploadError);
+        return res.status(500).json({ error: "فشل رفع الصور إلى السيرفر" });
     }
     
     let finalImages = [...uploadedImages];
@@ -269,12 +287,12 @@ app.put('/api/products/:id', authenticateToken, isAdmin, upload.array('imagesFil
     let uploadedImages = [];
     try {
         if (req.files && req.files.length > 0) {
-            const uploadPromises = req.files.map(file => uploadToCloudinary(file.buffer));
+            const uploadPromises = req.files.map(file => uploadImage(file));
             uploadedImages = await Promise.all(uploadPromises);
         }
     } catch (uploadError) {
-        console.error("Cloudinary upload error:", uploadError);
-        return res.status(500).json({ error: "فشل رفع الصور إلى السيرفر السحابي Cloudinary" });
+        console.error("Image upload error:", uploadError);
+        return res.status(500).json({ error: "فشل رفع الصور إلى السيرفر" });
     }
     
     let finalImages = [];
