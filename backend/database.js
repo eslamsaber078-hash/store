@@ -193,32 +193,6 @@ function initDb() {
         db.run("ALTER TABLE products ADD COLUMN reviews_count INTEGER", () => {});
         db.run("ALTER TABLE products ADD COLUMN in_stock INTEGER DEFAULT 1", () => {});
         db.run("ALTER TABLE products ADD COLUMN featured INTEGER DEFAULT 0", () => {});
-
-        db.get("SELECT COUNT(*) as count FROM products", [], (err, row) => {
-            if (!row || row.count !== 0) return;
-            try {
-                const productsData = require('../products.js');
-                const stmt = db.prepare(`INSERT INTO products
-                    (name, category, category_name, price, old_price, rating, reviews_count,
-                     image, description, sizes, colors, in_stock, featured)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
-                productsData.forEach(p => {
-                    stmt.run([
-                        p.name, p.category, p.categoryName,
-                        p.price, p.oldPrice, p.rating, p.reviewsCount,
-                        p.image, p.description,
-                        JSON.stringify(p.sizes  || []),
-                        JSON.stringify(p.colors || []),
-                        p.inStock  ? 1 : 0,
-                        p.featured ? 1 : 0
-                    ]);
-                });
-                stmt.finalize();
-                console.log("Seeded default products into database.");
-            } catch (e) {
-                console.log("Could not seed products:", e.message);
-            }
-        });
     });
 
     // 3. orders — already snake_case
