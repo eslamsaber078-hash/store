@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>لوحة الإدارة | Da Vinci Store</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;800&family=Montserrat:wght@300;400;600;700&family=Tajawal:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <link rel="stylesheet" href="./style.css">
+  <link rel="stylesheet" href="./admin.css">
+</head>
+<body class="admin-body">
+
+  <!-- ==================== LOGIN SCREEN ==================== -->
+  <div id="loginScreen" class="admin-auth-screen">
+    <div class="auth-card">
+      <div class="brand-logo mb-4 justify-center">
+        <span class="logo-accent">DA VINCI</span><span class="logo-main">STORE</span>
+      </div>
+      <h2 class="text-center mb-3">تسجيل دخول الإدارة</h2>
+      <form id="adminLoginForm">
+        <div class="form-group mb-3">
+          <label>اسم المستخدم</label>
+          <input type="text" id="loginUsername" required placeholder="أدخل اسم المستخدم">
+        </div>
+        <div class="form-group mb-4">
+          <label>كلمة المرور</label>
+          <input type="password" id="loginPassword" required placeholder="أدخل كلمة المرور">
+        </div>
+        <button type="submit" class="btn btn-primary w-100">تسجيل الدخول <i class="fa-solid fa-right-to-bracket"></i></button>
+        <div id="loginError" class="auth-error mt-3"></div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==================== ADMIN DASHBOARD ==================== -->
+  <div id="adminDashboard" class="admin-dashboard-layout" style="display: none;">
+    <!-- Sidebar -->
+    <aside class="admin-sidebar">
+      <div class="brand-logo mb-5">
+        <span class="logo-accent">DA VINCI</span><span class="logo-main"> ADMIN</span>
+      </div>
+      <ul class="admin-nav">
+        <li><button class="admin-nav-btn active" data-target="ordersView"><i class="fa-solid fa-box-open"></i> الطلبات</button></li>
+        <li><button class="admin-nav-btn" data-target="productsView"><i class="fa-solid fa-tags"></i> المنتجات</button></li>
+        <li><button class="admin-nav-btn" data-target="settingsView"><i class="fa-solid fa-money-check-dollar"></i> إعدادات الدفع</button></li>
+        <li><button class="admin-nav-btn" data-target="accountView"><i class="fa-solid fa-user-shield"></i> بيانات الحساب</button></li>
+      </ul>
+      <div class="admin-sidebar-footer">
+        <button id="logoutBtn" class="btn btn-outline w-100"><i class="fa-solid fa-arrow-right-from-bracket"></i> تسجيل الخروج</button>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="admin-main-content">
+      
+      <!-- 1. Orders View -->
+      <section id="ordersView" class="admin-section active">
+        <div class="section-header">
+          <h2>طلبات العملاء</h2>
+          <div style="display: flex; gap: 10px;">
+            <button class="btn btn-outline" onclick="downloadOrdersPDF()"><i class="fa-solid fa-file-pdf"></i> حفظ كـ PDF</button>
+            <button class="btn btn-secondary" onclick="fetchOrders()"><i class="fa-solid fa-rotate-right"></i> تحديث</button>
+          </div>
+        </div>
+        <div class="table-responsive">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>رقم الطلب</th>
+                <th>تاريخ الطلب</th>
+                <th>العميل</th>
+                <th>المبلغ الإجمالي</th>
+                <th>طريقة الدفع</th>
+                <th>الحالة</th>
+                <th>إجراءات</th>
+              </tr>
+            </thead>
+            <tbody id="ordersTableBody">
+              <!-- Rendered via JS -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- 2. Products View -->
+      <section id="productsView" class="admin-section" style="display: none;">
+        <div class="section-header">
+          <h2>إدارة المنتجات</h2>
+          <button class="btn btn-primary" onclick="openProductModal()"><i class="fa-solid fa-plus"></i> إضافة منتج جديد</button>
+        </div>
+        <div class="products-grid-admin" id="adminProductsGrid">
+          <!-- Rendered via JS -->
+        </div>
+      </section>
+
+      <!-- 3. Settings View -->
+      <section id="settingsView" class="admin-section" style="display: none;">
+        <div class="section-header">
+          <h2>إعدادات وطرق الدفع</h2>
+        </div>
+        <div class="admin-card">
+          <form id="paymentSettingsForm">
+            <div class="form-grid">
+              <div class="form-group col-12">
+                <label>رقم الحساب البنكي</label>
+                <input type="text" id="setBank" placeholder="مثال: البنك الأهلي EG...">
+              </div>
+              <div class="form-group col-12">
+                <label>حساب انستا باي (InstaPay)</label>
+                <input type="text" id="setInstapay" placeholder="username@instapay">
+              </div>
+              <div class="form-group col-12">
+                <label>خدمات المحافظ الإلكترونية</label>
+                <input type="text" id="setEwallets" placeholder="رقم الموبايل - فودافون كاش">
+              </div>
+              <div class="form-group col-12 mt-3">
+                <label class="filter-checkbox-container">
+                  <input type="checkbox" id="setCod">
+                  <span class="checkbox-checkmark"></span>
+                  تفعيل خدمة الدفع عند الاستلام (Cash on Delivery)
+                </label>
+              </div>
+            </div>
+            <div class="mt-4">
+              <button type="submit" class="btn btn-primary">حفظ الإعدادات <i class="fa-solid fa-save"></i></button>
+              <span id="settingsFeedback" class="feedback-msg"></span>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <!-- 4. Account View -->
+      <section id="accountView" class="admin-section" style="display: none;">
+        <div class="section-header">
+          <h2>إعدادات الحساب</h2>
+        </div>
+        <div class="admin-card">
+          <form id="accountForm">
+            <div class="form-group mb-3">
+              <label>اسم المستخدم الجديد</label>
+              <input type="text" id="accUsername" required>
+            </div>
+            <div class="form-group mb-3">
+              <label>كلمة المرور الجديدة (اختياري)</label>
+              <input type="password" id="accPassword" placeholder="اتركه فارغاً لعدم التغيير">
+            </div>
+            <div class="mt-4">
+              <button type="submit" class="btn btn-primary">تحديث بيانات الدخول <i class="fa-solid fa-user-pen"></i></button>
+              <span id="accountFeedback" class="feedback-msg"></span>
+            </div>
+          </form>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- Product Form Modal -->
+  <div class="modal" id="productModal">
+    <div class="modal-backdrop" onclick="closeProductModal()"></div>
+    <div class="checkout-modal-content">
+      <button class="close-modal-btn" onclick="closeProductModal()"><i class="fa-solid fa-xmark"></i></button>
+      <h3 class="checkout-step-title" id="productModalTitle">إضافة منتج جديد</h3>
+      <form id="productForm">
+        <input type="hidden" id="prodId">
+        <div class="form-grid">
+          <div class="form-group col-12">
+            <label>اسم المنتج *</label>
+            <input type="text" id="prodName" required>
+          </div>
+          <div class="form-group col-6">
+            <label>السعر (ج.م) *</label>
+            <input type="number" id="prodPrice" required>
+          </div>
+          <div class="form-group col-6">
+            <label>السعر القديم (اختياري)</label>
+            <input type="number" id="prodOldPrice">
+          </div>
+          <div class="form-group col-6">
+            <label>القسم (Identifier) *</label>
+            <select id="prodCategory" required>
+              <option value="clothing">clothing</option>
+              <option value="shoes">shoes</option>
+              <option value="pants">pants</option>
+              <option value="accessories">accessories</option>
+            </select>
+          </div>
+          <div class="form-group col-6">
+            <label>اسم القسم (للعرض) *</label>
+            <input type="text" id="prodCategoryName" required placeholder="مثال: أحذية">
+          </div>
+          <div class="form-group col-12">
+            <label>تحميل صور المنتج (يمكنك اختيار أكثر من صورة) *</label>
+            <input type="file" id="prodImageFiles" accept="image/*" multiple style="background:var(--color-bg-tertiary);border:1px solid var(--color-border);padding:10px;border-radius:var(--radius-md);color:#fff;width:100%;">
+            <input type="hidden" id="prodImage">
+            <div id="imagePreviewContainer" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;"></div>
+          </div>
+          <div class="form-group col-12">
+            <label>الوصف *</label>
+            <textarea id="prodDesc" rows="3" required style="background:var(--color-bg-tertiary);border:1px solid var(--color-border);padding:10px;border-radius:var(--radius-md);color:#fff;width:100%;"></textarea>
+          </div>
+          <div class="form-group col-12">
+            <label>المقاسات (مفصولة بفاصلة)</label>
+            <input type="text" id="prodSizes" placeholder="S, M, L, XL أو 40, 41, 42">
+          </div>
+          <!-- Color 1 Picker -->
+          <div class="form-group col-12">
+            <label>اللون الأول</label>
+            <div class="color-picker-widget" id="colorWidget1">
+              <div class="color-swatches">
+                <span class="color-swatch" data-name="أسود" data-code="#111111" style="background:#111111;" title="أسود"></span>
+                <span class="color-swatch" data-name="أبيض" data-code="#f5f5f5" style="background:#f5f5f5; border:1px solid #ccc;" title="أبيض"></span>
+                <span class="color-swatch" data-name="رمادي" data-code="#6b7280" style="background:#6b7280;" title="رمادي"></span>
+                <span class="color-swatch" data-name="بيج" data-code="#d4b896" style="background:#d4b896;" title="بيج"></span>
+                <span class="color-swatch" data-name="بني" data-code="#7c4f2f" style="background:#7c4f2f;" title="بني"></span>
+                <span class="color-swatch" data-name="كحلي" data-code="#1e3a5f" style="background:#1e3a5f;" title="كحلي"></span>
+                <span class="color-swatch" data-name="أزرق" data-code="#3b82f6" style="background:#3b82f6;" title="أزرق"></span>
+                <span class="color-swatch" data-name="أخضر" data-code="#16a34a" style="background:#16a34a;" title="أخضر"></span>
+                <span class="color-swatch" data-name="أحمر" data-code="#dc2626" style="background:#dc2626;" title="أحمر"></span>
+                <span class="color-swatch" data-name="وردي" data-code="#ec4899" style="background:#ec4899;" title="وردي"></span>
+                <span class="color-swatch" data-name="ذهبي" data-code="#D4AF37" style="background:#D4AF37;" title="ذهبي"></span>
+                <span class="color-swatch" data-name="زيتي" data-code="#4d6b47" style="background:#4d6b47;" title="زيتي"></span>
+              </div>
+              <div class="color-picker-row">
+                <input type="color" class="color-native-picker" id="colorPicker1" value="#111111" title="اختر لوناً مخصصاً">
+                <input type="text" class="color-name-input" id="colorName1" placeholder="اسم اللون (مثال: أسود)" value="أسود">
+                <span class="color-preview-dot" id="colorPreview1" style="background:#111111;"></span>
+              </div>
+              <input type="hidden" id="prodColor1">
+            </div>
+          </div>
+          <!-- Color 2 Picker -->
+          <div class="form-group col-12">
+            <label>اللون الثاني <span style="font-size:0.75rem; color: var(--color-text-muted);">(اختياري)</span></label>
+            <div class="color-picker-widget" id="colorWidget2">
+              <div class="color-swatches">
+                <span class="color-swatch color-swatch-none selected" data-name="" data-code="" style="background: repeating-linear-gradient(45deg,#555,#555 3px,#333 3px,#333 6px);" title="بدون لون ثاني">✕</span>
+                <span class="color-swatch" data-name="أسود" data-code="#111111" style="background:#111111;" title="أسود"></span>
+                <span class="color-swatch" data-name="أبيض" data-code="#f5f5f5" style="background:#f5f5f5; border:1px solid #ccc;" title="أبيض"></span>
+                <span class="color-swatch" data-name="رمادي" data-code="#6b7280" style="background:#6b7280;" title="رمادي"></span>
+                <span class="color-swatch" data-name="بيج" data-code="#d4b896" style="background:#d4b896;" title="بيج"></span>
+                <span class="color-swatch" data-name="بني" data-code="#7c4f2f" style="background:#7c4f2f;" title="بني"></span>
+                <span class="color-swatch" data-name="كحلي" data-code="#1e3a5f" style="background:#1e3a5f;" title="كحلي"></span>
+                <span class="color-swatch" data-name="أزرق" data-code="#3b82f6" style="background:#3b82f6;" title="أزرق"></span>
+                <span class="color-swatch" data-name="أخضر" data-code="#16a34a" style="background:#16a34a;" title="أخضر"></span>
+                <span class="color-swatch" data-name="أحمر" data-code="#dc2626" style="background:#dc2626;" title="أحمر"></span>
+                <span class="color-swatch" data-name="وردي" data-code="#ec4899" style="background:#ec4899;" title="وردي"></span>
+                <span class="color-swatch" data-name="ذهبي" data-code="#D4AF37" style="background:#D4AF37;" title="ذهبي"></span>
+                <span class="color-swatch" data-name="زيتي" data-code="#4d6b47" style="background:#4d6b47;" title="زيتي"></span>
+              </div>
+              <div class="color-picker-row">
+                <input type="color" class="color-native-picker" id="colorPicker2" value="#111111" title="اختر لوناً مخصصاً">
+                <input type="text" class="color-name-input" id="colorName2" placeholder="اسم اللون الثاني (اختياري)">
+                <span class="color-preview-dot" id="colorPreview2" style="background: repeating-linear-gradient(45deg,#555,#555 3px,#333 3px,#333 6px);"></span>
+              </div>
+              <input type="hidden" id="prodColor2">
+            </div>
+          </div>
+          <div class="form-group col-6 mt-2">
+            <label class="filter-checkbox-container">
+              <input type="checkbox" id="prodInStock" checked>
+              <span class="checkbox-checkmark"></span>
+              متوفر في المخزون
+            </label>
+          </div>
+          <div class="form-group col-6 mt-2">
+            <label class="filter-checkbox-container">
+              <input type="checkbox" id="prodFeatured">
+              <span class="checkbox-checkmark"></span>
+              منتج مميز (موصى به)
+            </label>
+          </div>
+        </div>
+        <div class="mt-4">
+          <button type="submit" class="btn btn-primary w-100">حفظ المنتج <i class="fa-solid fa-save"></i></button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Order Details Modal -->
+  <div class="modal" id="orderModal">
+    <div class="modal-backdrop" onclick="closeOrderModal()"></div>
+    <div class="checkout-modal-content">
+      <button class="close-modal-btn" onclick="closeOrderModal()"><i class="fa-solid fa-xmark"></i></button>
+      <h3 class="checkout-step-title">تفاصيل الطلب: <span id="modalOrderNumber" class="text-gold"></span></h3>
+      
+      <div class="admin-card mb-4" style="padding: 15px;">
+        <p><strong>العميل:</strong> <span id="moName"></span></p>
+        <p><strong>الهاتف:</strong> <span id="moPhone"></span></p>
+        <p><strong>العنوان:</strong> <span id="moAddress"></span>، <span id="moCity"></span>، <span id="moGov"></span></p>
+        <p><strong>طريقة الدفع:</strong> <span id="moPayment"></span></p>
+        <p id="moPaymentSenderRow" style="display: none;"><strong>حساب/هاتف المرسل:</strong> <span id="moPaymentSender" class="text-gold"></span></p>
+        <p id="moPaymentRefRow" style="display: none;"><strong>مرجع/كود التحويل:</strong> <span id="moPaymentRef" class="text-gold font-bold"></span></p>
+        <p><strong>الإجمالي:</strong> <span id="moTotal" class="text-gold font-bold"></span> ج.م</p>
+        <hr style="border: 0; border-top: 1px solid var(--color-border); margin: 10px 0;">
+        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+          <label style="font-weight: bold; margin: 0;">حالة الطلب:</label>
+          <select id="moStatusSelect" class="form-control" style="width: auto; padding: 5px 10px; background-color: var(--color-bg-tertiary); color: #fff; border: 1px solid var(--color-border); border-radius: var(--radius-sm);">
+            <option value="pending">قيد المراجعة</option>
+            <option value="pending_payment_verification">في انتظار تحقق الدفع</option>
+            <option value="completed">تم التوصيل</option>
+            <option value="cancelled">ملغي</option>
+          </select>
+          <button type="button" class="btn btn-primary" id="updateOrderStatusBtn" style="padding: 6px 12px; font-size: 0.85rem;">تحديث الحالة</button>
+        </div>
+      </div>
+
+      <h4>المنتجات المطلوبة:</h4>
+      <div class="table-responsive mt-3">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>المنتج</th>
+              <th>المقاس</th>
+              <th>اللون</th>
+              <th>الكمية</th>
+              <th>السعر</th>
+            </tr>
+          </thead>
+          <tbody id="modalOrderItems">
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- HTML2PDF CDN library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <script src="./admin.js"></script>
+</body>
+</html>

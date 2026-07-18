@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Da Vinci Store | متجر الأزياء والأحذية الفاخرة</title>
+  <meta name="description" content="اكتشف التشكيلة الحصرية من الملابس والأحذية والإكسسوارات الفاخرة في متجر Da Vinci Store. تجربة تسوق فريدة وجودة لا تضاهى.">
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;800&family=Montserrat:wght@300;400;600;700&family=Tajawal:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+  
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Custom Stylesheet -->
+  <link rel="stylesheet" href="./style.css">
+
+  <!-- Google Identity Services -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+
+  <!-- ==================== HEADER ==================== -->
+  <header class="main-header" id="mainHeader">
+    <!-- Announcement Bar -->
+    <div class="announcement-bar">
+      <p>شحن مجاني سريع للطلبات أكثر من 3,000 ج.م | استخدم كود <span class="promo-code-badge">DAVINCI10</span> للحصول على خصم 10%</p>
+    </div>
+
+    <!-- Main Navigation Bar -->
+    <div class="navbar-container">
+      <div class="navbar-inner">
+        <!-- Brand Logo -->
+        <a href="#" class="brand-logo" id="brandLogo">
+          <span class="logo-accent">DA VINCI</span><span class="logo-main">STORE</span>
+        </a>
+
+        <!-- Desktop Navigation Menu -->
+        <nav class="desktop-nav" aria-label="القائمة الرئيسية">
+          <ul>
+            <li><a href="#" class="nav-link active" data-category="all">الرئيسية</a></li>
+            <li><a href="#shop-section" class="nav-link" data-category="clothing">الملابس</a></li>
+            <li><a href="#shop-section" class="nav-link" data-category="shoes">الأحذية</a></li>
+            <li><a href="#shop-section" class="nav-link" data-category="pants">البناطيل</a></li>
+            <li><a href="#shop-section" class="nav-link" data-category="accessories">الإكسسوارات</a></li>
+          </ul>
+        </nav>
+
+        <!-- Navbar Controls & Action Icons -->
+        <div class="navbar-controls">
+          <!-- Search Bar Toggle (Desktop/Mobile) -->
+          <div class="search-wrapper">
+            <input type="text" id="searchInput" placeholder="ابحث عن منتجك الفاخر..." aria-label="بحث عن منتجات">
+            <button id="searchBtn" class="control-btn" aria-label="بحث"><i class="fa-solid fa-magnifying-glass"></i></button>
+          </div>
+
+          <!-- Auth Button -->
+          <button id="userAuthBtn" class="control-btn" aria-label="تسجيل الدخول">
+            <i class="fa-solid fa-user"></i>
+          </button>
+
+          <!-- Wishlist Button -->
+          <button id="wishlistToggleBtn" class="control-btn" aria-label="المفضلة">
+            <i class="fa-regular fa-heart"></i>
+            <span class="badge" id="wishlistCount">0</span>
+          </button>
+
+          <!-- Cart Button -->
+          <button id="cartToggleBtn" class="control-btn cart-trigger" aria-label="سلة التسوق">
+            <i class="fa-solid fa-bag-shopping"></i>
+            <span class="badge" id="cartCount">0</span>
+          </button>
+
+          <!-- Mobile Menu Toggle Button -->
+          <button id="mobileMenuBtn" class="control-btn mobile-only" aria-label="القائمة الجانبية للموبايل">
+            <i class="fa-solid fa-bars-staggered"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Mobile Nav Drawer -->
+  <div class="mobile-drawer" id="mobileDrawer">
+    <div class="drawer-header">
+      <h3>القائمة</h3>
+      <button class="close-drawer-btn" id="closeMobileDrawer"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <nav class="mobile-nav-links">
+      <ul>
+        <li><a href="#" class="mobile-nav-link active" data-category="all">الرئيسية</a></li>
+        <li><a href="#shop-section" class="mobile-nav-link" data-category="clothing">الملابس</a></li>
+        <li><a href="#shop-section" class="mobile-nav-link" data-category="shoes">الأحذية</a></li>
+        <li><a href="#shop-section" class="mobile-nav-link" data-category="pants">البناطيل</a></li>
+        <li><a href="#shop-section" class="mobile-nav-link" data-category="accessories">الإكسسوارات</a></li>
+      </ul>
+    </nav>
+  </div>
+  <div class="drawer-overlay" id="drawerOverlay"></div>
+
+  <!-- ==================== HERO SECTION (SLIDER) ==================== -->
+  <section class="hero-slider-section">
+    <div class="hero-slider" id="heroSlider">
+      <!-- Slide 1 -->
+      <div class="slide active" style="background-image: linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.75)), url('./assets/images/hero_slide_1.jpg');">
+        <div class="slide-content">
+          <span class="slide-subtitle">مجموعة الصيف الفخمة 2026</span>
+          <h1 class="slide-title">أناقة تتحدث عن هويتك</h1>
+          <p class="slide-desc">مزيج ساحر من الأزياء الإيطالية والأحذية المصنوعة يدوياً لتعكس حضوراً لا يُنسى.</p>
+          <div class="slide-actions">
+            <a href="#shop-section" class="btn btn-primary">تسوق المجموعة الآن <i class="fa-solid fa-arrow-left"></i></a>
+            <a href="#shop-section" class="btn btn-secondary" data-filter-featured="true">الأكثر مبيعاً</a>
+          </div>
+        </div>
+      </div>
+      <!-- Slide 2 -->
+      <div class="slide" style="background-image: linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.75)), url('./assets/images/hero_slide_2.jpg');">
+        <div class="slide-content">
+          <span class="slide-subtitle">خطوات من التميز</span>
+          <h1 class="slide-title">خطوتك القادمة أكثر فخامة</h1>
+          <p class="slide-desc">أحذية رياضية وكلاسيكية صُممت لراحتك التامة ولمظهر رياضي ملكي فريد.</p>
+          <div class="slide-actions">
+            <a href="#shop-section" class="btn btn-primary" data-category-filter="shoes">تصفح الأحذية <i class="fa-solid fa-arrow-left"></i></a>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Slider Navigation Dots -->
+    <div class="slider-dots" id="sliderDots">
+      <span class="dot active" data-slide="0"></span>
+      <span class="dot" data-slide="1"></span>
+    </div>
+  </section>
+
+  <!-- ==================== QUICK STATS ==================== -->
+  <section class="stats-bar">
+    <div class="stats-container">
+      <div class="stat-item">
+        <div class="stat-icon"><i class="fa-solid fa-truck-fast"></i></div>
+        <div class="stat-info">
+          <h4>شحن سريع ومجاني</h4>
+          <p>شحن خلال 24-48 ساعة لجميع المحافظات</p>
+        </div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-icon"><i class="fa-solid fa-rotate-left"></i></div>
+        <div class="stat-info">
+          <h4>استرجاع واستبدال مرن</h4>
+          <p>خلال 14 يوماً بكل سهولة وسلاسة</p>
+        </div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-icon"><i class="fa-solid fa-shield-halved"></i></div>
+        <div class="stat-info">
+          <h4>جودة مضمونة 100%</h4>
+          <p>منتجات أصلية من خامات طبيعية ممتازة</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== SECTIONS PREVIEW (CATEGORIES) ==================== -->
+  <section class="categories-showcase">
+    <div class="section-title-wrapper">
+      <span class="section-subtitle">اختر فئتك المفضلة</span>
+      <h2 class="section-title">فئات التسوق الفاخرة</h2>
+      <div class="title-divider"></div>
+    </div>
+    <div class="categories-grid">
+      <!-- Clothing Category Card -->
+      <a href="#shop-section" class="category-card" data-category="clothing">
+        <div class="category-img-container">
+          <img src="./assets/images/cat_clothing.jpg" alt="الملابس الفاخرة">
+          <div class="category-overlay">
+            <h3>الملابس الراقية</h3>
+            <span class="category-link">تصفح الآن <i class="fa-solid fa-circle-arrow-left"></i></span>
+          </div>
+        </div>
+      </a>
+      <!-- Shoes Category Card -->
+      <a href="#shop-section" class="category-card" data-category="shoes">
+        <div class="category-img-container">
+          <img src="./assets/images/cat_shoes.jpg" alt="الأحذية الممتازة">
+          <div class="category-overlay">
+            <h3>أفخم الأحذية</h3>
+            <span class="category-link">تصفح الآن <i class="fa-solid fa-circle-arrow-left"></i></span>
+          </div>
+        </div>
+      </a>
+      <!-- Pants Category Card -->
+      <a href="#shop-section" class="category-card" data-category="pants">
+        <div class="category-img-container">
+          <img src="./assets/images/cat_pants.jpg" alt="البناطيل العصرية">
+          <div class="category-overlay">
+            <h3>البناطيل والجينز</h3>
+            <span class="category-link">تصفح الآن <i class="fa-solid fa-circle-arrow-left"></i></span>
+          </div>
+        </div>
+      </a>
+      <!-- Accessories Category Card -->
+      <a href="#shop-section" class="category-card" data-category="accessories">
+        <div class="category-img-container">
+          <img src="./assets/images/cat_accessories.jpg" alt="الإكسسوارات الفاخرة">
+          <div class="category-overlay">
+            <h3>الساعات والإكسسوارات</h3>
+            <span class="category-link">تصفح الآن <i class="fa-solid fa-circle-arrow-left"></i></span>
+          </div>
+        </div>
+      </a>
+    </div>
+  </section>
+
+  <!-- ==================== MAIN SHOP CONTEXT ==================== -->
+  <main class="shop-section-wrapper" id="shop-section">
+    <!-- Header of shop section -->
+    <div class="shop-header">
+      <div class="shop-title-area">
+        <h2 id="currentCategoryTitle">كل المنتجات الفاخرة</h2>
+        <p id="productsCountText">جاري تحميل المنتجات...</p>
+      </div>
+
+      <!-- Controls: Mobile Filter Toggle & Desktop Sort -->
+      <div class="shop-controls">
+        <button id="mobileFilterToggleBtn" class="btn btn-outline mobile-only">
+          <i class="fa-solid fa-sliders"></i> التصفية والتصفح
+        </button>
+        <div class="sort-selector-wrapper">
+          <label for="sortBySelect">ترتيب حسب:</label>
+          <select id="sortBySelect" class="sort-select">
+            <option value="featured">الأكثر تميزاً</option>
+            <option value="price-asc">السعر: من الأقل للأعلى</option>
+            <option value="price-desc">السعر: من الأعلى للأقل</option>
+            <option value="rating">التقييم: الأعلى أولاً</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Shop Content (Sidebar + Products Grid) -->
+    <div class="shop-layout-container">
+      
+      <!-- Desktop Sidebar Filter / Mobile Drawer Filter -->
+      <aside class="shop-sidebar-filter" id="filterSidebar">
+        <div class="filter-sidebar-header mobile-only">
+          <h3>خيارات التصفية</h3>
+          <button id="closeFilterSidebar" class="close-drawer-btn"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+
+        <div class="filter-group">
+          <h4 class="filter-title">البحث</h4>
+          <div class="sidebar-search">
+            <input type="text" id="sidebarSearchInput" placeholder="ابحث بالاسم...">
+            <i class="fa-solid fa-magnifying-glass"></i>
+          </div>
+        </div>
+
+        <div class="filter-group">
+          <h4 class="filter-title">الأقسام</h4>
+          <ul class="filter-categories-list">
+            <li><button class="cat-filter-btn active" data-cat="all">الكل <span class="cat-count" id="count-all">0</span></button></li>
+            <li><button class="cat-filter-btn" data-cat="clothing">ملابس <span class="cat-count" id="count-clothing">0</span></button></li>
+            <li><button class="cat-filter-btn" data-cat="shoes">أحذية <span class="cat-count" id="count-shoes">0</span></button></li>
+            <li><button class="cat-filter-btn" data-cat="pants">بناطيل <span class="cat-count" id="count-pants">0</span></button></li>
+            <li><button class="cat-filter-btn" data-cat="accessories">إكسسوارات <span class="cat-count" id="count-accessories">0</span></button></li>
+          </ul>
+        </div>
+
+        <div class="filter-group">
+          <h4 class="filter-title">نطاق السعر</h4>
+          <div class="price-slider-wrapper">
+            <div class="price-inputs">
+              <span id="priceMinVal">0 ج.م</span>
+              <span id="priceMaxVal">15,000 ج.م</span>
+            </div>
+            <input type="range" id="priceRangeSlider" min="0" max="15000" step="100" value="15000" aria-label="فلتر السعر">
+          </div>
+        </div>
+
+        <div class="filter-group">
+          <h4 class="filter-title">حالة التوفر</h4>
+          <label class="filter-checkbox-container">
+            <input type="checkbox" id="inStockCheckbox" checked>
+            <span class="checkbox-checkmark"></span>
+            المنتجات المتوفرة فقط
+          </label>
+          <label class="filter-checkbox-container">
+            <input type="checkbox" id="featuredCheckbox">
+            <span class="checkbox-checkmark"></span>
+            المنتجات الأكثر مبيعاً
+          </label>
+        </div>
+
+        <button id="resetFiltersBtn" class="btn btn-outline w-100">إعادة تعيين الفلاتر</button>
+      </aside>
+
+      <!-- Products Grid -->
+      <section class="products-grid-wrapper">
+        <div class="products-grid" id="productsGrid">
+          <!-- Products will be generated dynamically here by JS -->
+        </div>
+
+        <!-- No products found state -->
+        <div class="no-products-found" id="noProductsFound" style="display: none;">
+          <div class="empty-icon"><i class="fa-solid fa-magnifying-glass"></i></div>
+          <h3>عذراً، لم نجد أي نتائج متوافقة</h3>
+          <p>يرجى تعديل خيارات التصفية أو البحث عن كلمة أخرى.</p>
+          <button id="resetFiltersBtnEmpty" class="btn btn-primary">إعادة تعيين جميع الفلاتر</button>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- ==================== PREMIUM USER FEEDBACK / REVIEWS ==================== -->
+  <section class="reviews-section">
+    <div class="section-title-wrapper">
+      <span class="section-subtitle">آراء عملائنا النخبة</span>
+      <h2 class="section-title">تقييمات وتجارب راقية</h2>
+      <div class="title-divider"></div>
+    </div>
+    
+    <div class="reviews-container">
+      <div class="reviews-summary-card">
+        <div class="average-rating">
+          <h3>4.8</h3>
+          <div class="stars">
+            <i class="fa-solid fa-star"></i>
+            <i class="fa-solid fa-star"></i>
+            <i class="fa-solid fa-star"></i>
+            <i class="fa-solid fa-star"></i>
+            <i class="fa-solid fa-star-half-stroke"></i>
+          </div>
+          <p>تقييم عام بناءً على 1,420 رأي موثق</p>
+        </div>
+        <div class="rating-bars-container">
+          <div class="rating-bar-item">
+            <span>5 نجوم</span>
+            <div class="rating-bar"><div class="rating-progress" style="width: 82%;"></div></div>
+            <span>82%</span>
+          </div>
+          <div class="rating-bar-item">
+            <span>4 نجوم</span>
+            <div class="rating-bar"><div class="rating-progress" style="width: 12%;"></div></div>
+            <span>12%</span>
+          </div>
+          <div class="rating-bar-item">
+            <span>3 نجوم</span>
+            <div class="rating-bar"><div class="rating-progress" style="width: 4%;"></div></div>
+            <span>4%</span>
+          </div>
+          <div class="rating-bar-item">
+            <span>نجمتان</span>
+            <div class="rating-bar"><div class="rating-progress" style="width: 1%;"></div></div>
+            <span>1%</span>
+          </div>
+          <div class="rating-bar-item">
+            <span>نجمة</span>
+            <div class="rating-bar"><div class="rating-progress" style="width: 1%;"></div></div>
+            <span>1%</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="reviews-feed">
+        <!-- Review 1 -->
+        <div class="review-item">
+          <div class="review-meta">
+            <div class="user-avatar"><i class="fa-solid fa-user-tie"></i></div>
+            <div class="user-info">
+              <h4>أحمد عبد الرحمن</h4>
+              <span class="review-date">منذ يومين</span>
+            </div>
+            <div class="user-stars">
+              <i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i>
+            </div>
+          </div>
+          <p class="review-text">"الحذاء الترا بوست الذهبي فخم جداً ومريح في المشي بشكل لا يوصف، والتغليف راقي يليق بماركة فخمة. الشحن وصل في أقل من 24 ساعة للقاهرة. أنصح به بشدة."</p>
+          <span class="verified-purchase"><i class="fa-solid fa-circle-check"></i> مشترٍ مؤكد</span>
+        </div>
+        <!-- Review 2 -->
+        <div class="review-item">
+          <div class="review-meta">
+            <div class="user-avatar"><i class="fa-solid fa-user"></i></div>
+            <div class="user-info">
+              <h4>خالد الشمري</h4>
+              <span class="review-date">منذ أسبوع</span>
+            </div>
+            <div class="user-stars">
+              <i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i>
+            </div>
+          </div>
+          <p class="review-text">"اشتريت السترة الجلدية 'ستيلث' فخامة الجلد الطبيعي ممتازة والقصة مضبوطة تماماً. الموقع سهل التصفح وسريع جداً في الاستخدام، خيار العرض السريع وفر عليّ الكثير من الوقت."</p>
+          <span class="verified-purchase"><i class="fa-solid fa-circle-check"></i> مشترٍ مؤكد</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== NEWSLETTER ==================== -->
+  <section class="newsletter-section">
+    <div class="newsletter-card">
+      <div class="newsletter-content">
+        <h2>انضم إلى نادي النخبة Da Vinci</h2>
+        <p>سجل بريدك الإلكتروني لتصلك أحدث المجموعات الحصرية والعروض الفاخرة المخصصة للأعضاء فقط.</p>
+        <form class="newsletter-form" id="newsletterForm">
+          <input type="email" id="newsletterEmail" placeholder="أدخل بريدك الإلكتروني الفاخر هنا..." required aria-label="البريد الإلكتروني للنشرة البريدية">
+          <button type="submit" class="btn btn-primary">اشترك الآن</button>
+        </form>
+        <div id="newsletterMessage" class="newsletter-feedback-msg"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== FOOTER ==================== -->
+  <footer class="main-footer">
+    <div class="footer-container">
+      <div class="footer-col brand-col">
+        <a href="#" class="brand-logo">
+          <span class="logo-accent">DA VINCI</span><span class="logo-main">STORE</span>
+        </a>
+        <p class="footer-brand-desc">عنوان الفخامة والرقي في عالم الأزياء والملابس والأحذية. نختار لكم أفضل الخامات وأحدث خطوط الموضة العالمية بدقة متناهية لتتميز في كل مناسبة.</p>
+        <div class="social-links">
+          <a href="#" aria-label="فيسبوك"><i class="fa-brands fa-facebook-f"></i></a>
+          <a href="#" aria-label="انستجرام"><i class="fa-brands fa-instagram"></i></a>
+          <a href="#" aria-label="تويتر"><i class="fa-brands fa-twitter"></i></a>
+          <a href="#" aria-label="تيك توك"><i class="fa-brands fa-tiktok"></i></a>
+        </div>
+      </div>
+      <div class="footer-col">
+        <h3>روابط سريعة</h3>
+        <ul class="footer-links">
+          <li><a href="#shop-section" data-cat="all">جميع المنتجات</a></li>
+          <li><a href="#shop-section" data-cat="clothing">الملابس الراقية</a></li>
+          <li><a href="#shop-section" data-cat="shoes">الأحذية الملكية</a></li>
+          <li><a href="#shop-section" data-cat="pants">البناطيل العصرية</a></li>
+          <li><a href="#shop-section" data-cat="accessories">الساعات والإكسسوارات</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h3>الدعم والخدمات</h3>
+        <ul class="footer-links">
+          <li><a href="#">سياسة الاسترجاع والاستبدال</a></li>
+          <li><a href="#">تتبع طلبك الفاخر</a></li>
+          <li><a href="#">شروط وأحكام النخبة</a></li>
+          <li><a href="#">موقع فروعنا</a></li>
+          <li><a href="#">مركز المساعدة</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h3>تواصل معنا</h3>
+        <ul class="footer-contact">
+          <li><span class="contact-icon"><i class="fa-solid fa-location-dot"></i></span> شارع التحرير، وسط البلد، القاهرة، مصر</li>
+          <li><span class="contact-icon"><i class="fa-solid fa-phone"></i></span> <span dir="ltr">19999 (الخط الساخن)</span></li>
+          <li><span class="contact-icon"><i class="fa-solid fa-envelope"></i></span> support@davincistore.com</li>
+          <li><span class="contact-icon"><i class="fa-solid fa-clock"></i></span> طوال أيام الأسبوع من 10:00 ص إلى 10:00 م</li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p>&copy; 2026 جميع الحقوق محفوظة لمتجر <span class="logo-accent">DA VINCI</span><span class="logo-main">STORE</span>. صُنع بكل فخامة.</p>
+    </div>
+  </footer>
+
+  <!-- ==================== SIDE WISHLIST DRAWER ==================== -->
+  <div class="cart-drawer" id="wishlistDrawer">
+    <div class="drawer-header">
+      <h3>قائمة المفضلة الخاصة بك (<span id="wishlistCountTitle">0</span>)</h3>
+      <button class="close-drawer-btn" id="closeWishlistBtn"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    
+    <!-- Empty Wishlist State -->
+    <div class="cart-empty-state" id="wishlistEmptyState">
+      <div class="empty-icon"><i class="fa-regular fa-heart"></i></div>
+      <h4>قائمة المفضلة فارغة</h4>
+      <p>تصفح التشكيلات الفاخرة وقم بإضافة المنتجات المفضلة لديك هنا لتصل إليها لاحقاً.</p>
+      <a href="#shop-section" class="btn btn-primary" id="wishlistStartShoppingBtn">ابدأ التصفح الآن</a>
+    </div>
+
+    <!-- Filled Wishlist Container -->
+    <div class="cart-filled-state" id="wishlistFilledState" style="display: none;">
+      <!-- Wishlist Items list -->
+      <div class="cart-items-list" id="wishlistItemsList">
+        <!-- Rendered by JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== SIDE CART DRAWER ==================== -->
+  <div class="cart-drawer" id="cartDrawer">
+    <div class="drawer-header">
+      <h3>حقيبة التسوق الخاصة بك (<span id="cartCountTitle">0</span>)</h3>
+      <button class="close-drawer-btn" id="closeCartBtn"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    
+    <!-- Empty Cart State -->
+    <div class="cart-empty-state" id="cartEmptyState">
+      <div class="empty-icon"><i class="fa-solid fa-bag-shopping"></i></div>
+      <h4>حقيبتك فارغة تماماً</h4>
+      <p>اكتشف تشكيلتنا الفاخرة وأضف بعض المنتجات لتبهر من حولك.</p>
+      <a href="#shop-section" class="btn btn-primary" id="startShoppingBtn">ابدأ التسوق الآن</a>
+    </div>
+
+    <!-- Filled Cart Container -->
+    <div class="cart-filled-state" id="cartFilledState" style="display: none;">
+      <!-- Cart Items list -->
+      <div class="cart-items-list" id="cartItemsList">
+        <!-- Rendered by JS -->
+      </div>
+
+      <!-- Cart Calculations -->
+      <div class="cart-summary-section">
+        <!-- Promo Code Area -->
+        <div class="promo-code-container">
+          <input type="text" id="promoInput" placeholder="أدخل كود الخصم (مثل DAVINCI10)..." aria-label="رمز الكود الترويجي">
+          <button id="applyPromoBtn" class="btn btn-outline">تطبيق</button>
+        </div>
+        <div id="promoFeedbackMsg" class="promo-feedback-msg"></div>
+
+        <!-- Price breakdown -->
+        <div class="price-breakdown">
+          <div class="price-row">
+            <span>المجموع الفرعي:</span>
+            <span id="cartSubtotal">0 ج.م</span>
+          </div>
+          <div class="price-row text-gold" id="discountRow" style="display: none;">
+            <span>الخصم المطبق:</span>
+            <span id="cartDiscount">-0 ج.م</span>
+          </div>
+          <div class="price-row">
+            <span>تكلفة الشحن:</span>
+            <span id="cartShipping">مجاني</span>
+          </div>
+          <div class="price-row total-row">
+            <span>الإجمالي الكلي:</span>
+            <span id="cartTotal">0 ج.م</span>
+          </div>
+        </div>
+
+        <!-- Checkout Buttons -->
+        <button id="checkoutBtn" class="btn btn-primary w-100">إتمام الشراء والدفع <i class="fa-solid fa-arrow-left"></i></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== USER AUTH MODAL ==================== -->
+  <div class="modal" id="userAuthModal">
+    <div class="modal-backdrop" id="authBackdrop"></div>
+    <div class="checkout-modal-content" style="max-width: 450px;">
+      <button class="close-modal-btn" id="closeAuthBtn"><i class="fa-solid fa-xmark"></i></button>
+      
+      <!-- Login & Profile Form Container -->
+      <div id="authContentContainer" style="padding: 20px 10px; text-align: center;">
+        <!-- State 1: Anonymous (Needs to sign in) -->
+        <div id="anonymousAuthState">
+          <div style="font-size: 2.8rem; color: var(--color-gold); margin-bottom: 15px;">
+            <i class="fa-solid fa-circle-user"></i>
+          </div>
+          <h3 class="checkout-step-title text-center" style="margin-bottom: 10px;">تسجيل الدخول للنخبة</h3>
+          <p style="font-size: 0.85rem; color: var(--color-text-secondary); line-height: 1.6; margin-bottom: 30px;">
+            سجل دخولك باستخدام حساب جوجل لتتمتع بتجربة تسوق فاخرة وحفظ طلباتك ومفضلتك الخاصة.
+          </p>
+          
+          <!-- Google GSI Sign-In Button Container -->
+          <div style="display: flex; justify-content: center; margin-bottom: 15px;">
+            <div id="googleSignInButton"></div>
+          </div>
+          
+          <!-- Mock Fallback Testing button for Localhost -->
+          <div style="margin-top: 25px; border-top: 1px solid var(--color-border); padding-top: 20px;">
+            <button id="mockGoogleLoginBtn" class="btn btn-outline w-100" style="font-size: 0.85rem; padding: 12px;">
+              <i class="fa-brands fa-google" style="margin-left: 8px; color: #EA4335;"></i> الدخول السريع بحساب جوجل (تجريبي)
+            </button>
+            <small style="display: block; color: var(--color-text-muted); font-size: 0.7rem; margin-top: 8px; line-height: 1.4;">
+              * اضغط للدخول مباشرة بحساب Google تجريبي دون الحاجة لتهيئة مفاتيح المطورين (Local Developer Fallback).
+            </small>
+          </div>
+          
+          <div id="userLoginError" class="auth-error mt-3" style="color:var(--color-danger); font-size: 0.85rem;"></div>
+        </div>
+        
+        <!-- State 2: Logged In (Show user details & Logout) -->
+        <div id="loggedInAuthState" style="display: none;">
+          <div id="userAvatarContainer" style="margin-bottom: 15px; position: relative; display: inline-block;">
+            <img id="userAvatarImg" src="" alt="صورة المستخدم" style="width: 85px; height: 85px; border-radius: 50%; border: 2px solid var(--color-gold); object-fit: cover;">
+          </div>
+          <h3 id="userDisplayName" style="font-size: 1.35rem; font-weight: 700; color: #fff; margin-bottom: 5px;">اسم المستخدم</h3>
+          <p id="userDisplayEmail" style="font-size: 0.85rem; color: var(--color-gold); margin-bottom: 25px;">email@gmail.com</p>
+          
+          <div style="border-top: 1px solid var(--color-border); padding-top: 25px;">
+            <button id="userLogoutBtn" class="btn btn-secondary w-100" style="color: var(--color-danger); border-color: var(--color-danger); padding: 12px;">
+              تسجيل الخروج <i class="fa-solid fa-right-from-bracket" style="margin-right: 8px;"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== QUICK VIEW MODAL ==================== -->
+  <div class="modal" id="quickViewModal">
+    <div class="modal-backdrop" id="quickViewBackdrop"></div>
+    <div class="modal-content-wrapper">
+      <button class="close-modal-btn" id="closeQuickViewBtn"><i class="fa-solid fa-xmark"></i></button>
+      
+      <div class="quickview-grid">
+        <!-- Product Images Gallery -->
+        <div class="quickview-gallery">
+          <div class="main-image-container">
+            <img id="qvMainImage" src="" alt="صورة المنتج الرئيسية">
+            <span class="discount-badge" id="qvDiscountBadge" style="display: none;">خصم</span>
+          </div>
+          <div class="thumbnails-container" id="qvThumbnails"></div>
+        </div>
+
+        <!-- Product Specs and Add Cart -->
+        <div class="quickview-info">
+          <span class="product-cat-tag" id="qvCategory">أحذية فاخرة</span>
+          <h2 id="qvName">اسم المنتج الفاخر</h2>
+          
+          <div class="qv-rating-wrapper">
+            <div class="stars" id="qvStars">
+              <!-- JS dynamic stars -->
+            </div>
+            <span class="reviews-count-text" id="qvReviewsText">(45 تقييم من العملاء)</span>
+          </div>
+
+          <div class="qv-price-wrapper">
+            <span class="current-price" id="qvPrice">0 ج.م</span>
+            <span class="old-price" id="qvOldPrice">0 ج.م</span>
+          </div>
+
+          <p class="qv-desc" id="qvDescription">شرح مميزات هذا المنتج ومواده وصناعته بالتفصيل المريح والجاذب.</p>
+
+          <!-- Color Swatches Selection -->
+          <div class="qv-spec-group">
+            <h4 class="spec-label">اللون المختار: <span class="selected-spec-val" id="qvSelectedColorText">أسود ذهبي</span></h4>
+            <div class="color-options-swatches" id="qvColorsContainer">
+              <!-- JS color buttons -->
+            </div>
+          </div>
+
+          <!-- Size Options Selection -->
+          <div class="qv-spec-group">
+            <h4 class="spec-label">المقاس المختار: <span class="selected-spec-val" id="qvSelectedSizeText">غير محدد</span></h4>
+            <div class="size-options-swatches" id="qvSizesContainer">
+              <!-- JS size buttons -->
+            </div>
+          </div>
+
+          <!-- Quantity and Action Buttons -->
+          <div class="qv-actions-wrapper">
+            <div class="quantity-selector">
+              <button class="qty-btn" id="qvQtyMinus"><i class="fa-solid fa-minus"></i></button>
+              <input type="number" id="qvQtyVal" value="1" min="1" max="10" aria-label="كمية المنتج">
+              <button class="qty-btn" id="qvQtyPlus"><i class="fa-solid fa-plus"></i></button>
+            </div>
+            <button id="qvAddToCartBtn" class="btn btn-primary flex-grow-1"><i class="fa-solid fa-bag-shopping"></i> إضافة لحقيبة التسوق</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== PREMIUM CHECKOUT DIALOG (WIZARD) ==================== -->
+  <div class="modal" id="checkoutModal">
+    <div class="modal-backdrop" id="checkoutBackdrop"></div>
+    <div class="checkout-modal-content">
+      <button class="close-modal-btn" id="closeCheckoutBtn"><i class="fa-solid fa-xmark"></i></button>
+      
+      <div class="checkout-container">
+        <!-- Progress Steps -->
+        <div class="checkout-steps-progress">
+          <div class="step-progress-item active" id="stepIndicator1">
+            <span class="step-num">1</span>
+            <span class="step-label">العنوان والشحن</span>
+          </div>
+          <div class="step-line" id="stepLine1"></div>
+          <div class="step-progress-item" id="stepIndicator2">
+            <span class="step-num">2</span>
+            <span class="step-label">الدفع الفاخر</span>
+          </div>
+          <div class="step-line" id="stepLine2"></div>
+          <div class="step-progress-item" id="stepIndicator3">
+            <span class="step-num">3</span>
+            <span class="step-label">تأكيد الطلب</span>
+          </div>
+        </div>
+
+        <!-- Wizard Contents -->
+        <form id="checkoutForm" class="checkout-wizard-form">
+          <!-- STEP 1: Shipping Info -->
+          <div class="checkout-step-content active" id="checkoutStep1">
+            <h3 class="checkout-step-title">معلومات الشحن والتوصيل</h3>
+            <div class="form-grid">
+              <div class="form-group col-6">
+                <label for="coFirstName">الاسم الأول *</label>
+                <input type="text" id="coFirstName" required placeholder="أحمد">
+              </div>
+              <div class="form-group col-6">
+                <label for="coLastName">اسم العائلة *</label>
+                <input type="text" id="coLastName" required placeholder="أبو الدهب">
+              </div>
+              <div class="form-group col-12">
+                <label for="coPhone">رقم الجوال *</label>
+                <input type="tel" id="coPhone" required placeholder="01XXXXXXXXX" pattern="^(010|011|012|015)[0-9]{8}$">
+                <small class="field-help">رقم هاتف مصري صحيح (11 رقماً)</small>
+              </div>
+              <div class="form-group col-12">
+                <label for="coAddress">العنوان التفصيلي *</label>
+                <input type="text" id="coAddress" required placeholder="رقم المبنى، اسم الشارع، الحي، الشقة">
+              </div>
+              <div class="form-group col-6">
+                <label for="coGovernorate">المحافظة *</label>
+                <select id="coGovernorate" required>
+                  <option value="" disabled selected>اختر محافظتك</option>
+                  <option value="القاهرة">القاهرة</option>
+                  <option value="الجيزة">الجيزة</option>
+                  <option value="الأسكندرية">الأسكندرية</option>
+                  <option value="القليوبية">القليوبية</option>
+                  <option value="الشرقية">الشرقية</option>
+                  <option value="الغربية">الغربية</option>
+                  <option value="الدقهلية">الدقهلية</option>
+                  <option value="أخرى">محافظة أخرى</option>
+                </select>
+              </div>
+              <div class="form-group col-6">
+                <label for="coCity">المدينة أو المنطقة *</label>
+                <input type="text" id="coCity" required placeholder="مصر الجديدة">
+              </div>
+            </div>
+            <div class="checkout-step-actions">
+              <div></div> <!-- placeholder space -->
+              <button type="button" class="btn btn-primary" id="coNextStep1">المتابعة للدفع <i class="fa-solid fa-arrow-left"></i></button>
+            </div>
+          </div>
+
+          <!-- STEP 2: Payment Options -->
+          <div class="checkout-step-content" id="checkoutStep2">
+            <h3 class="checkout-step-title">طريقة الدفع الفاخرة</h3>
+            
+            <div class="payment-options-grid">
+              <!-- Cash on delivery -->
+              <label class="payment-option-card">
+                <input type="radio" name="paymentMethod" value="cod" checked>
+                <span class="payment-card-inner">
+                  <span class="payment-icon"><i class="fa-solid fa-hand-holding-dollar"></i></span>
+                  <span class="payment-name">الدفع عند الاستلام</span>
+                  <span class="payment-desc">ادفع نقداً عند استلام طلبك من مندوب التوصيل الفاخر.</span>
+                </span>
+              </label>
+
+              <!-- Card Payment -->
+              <label class="payment-option-card">
+                <input type="radio" name="paymentMethod" value="card">
+                <span class="payment-card-inner">
+                  <span class="payment-icon"><i class="fa-regular fa-credit-card"></i></span>
+                  <span class="payment-name">البطاقة الائتمانية والخصم</span>
+                  <span class="payment-desc">فيزا، ماستركارد، أو ميزة. دفع آمن ومشفر 100%.</span>
+                </span>
+              </label>
+            </div>
+
+            <!-- Card inputs layout (shows only if card is checked) -->
+            <div class="card-details-form" id="cardDetailsForm" style="display: none;">
+              <div class="form-grid">
+                <div class="form-group col-12">
+                  <label for="coCardName">الاسم المكتوب على البطاقة</label>
+                  <input type="text" id="coCardName" placeholder="AHMED ABULDAHAB">
+                </div>
+                <div class="form-group col-12">
+                  <label for="coCardNum">رقم البطاقة</label>
+                  <div class="input-with-icon">
+                    <input type="text" id="coCardNum" placeholder="4000 1234 5678 9010" maxlength="19">
+                    <i class="fa-solid fa-credit-card"></i>
+                  </div>
+                </div>
+                <div class="form-group col-6">
+                  <label for="coCardExpiry">تاريخ الانتهاء</label>
+                  <input type="text" id="coCardExpiry" placeholder="MM/YY" maxlength="5">
+                </div>
+                <div class="form-group col-6">
+                  <label for="coCardCVV">رمز التحقق (CVV)</label>
+                  <input type="password" id="coCardCVV" placeholder="***" maxlength="3">
+                </div>
+              </div>
+            </div>
+
+            <div class="checkout-step-actions">
+              <button type="button" class="btn btn-outline" id="coPrevStep2"><i class="fa-solid fa-arrow-right"></i> رجوع للعنوان</button>
+              <button type="button" class="btn btn-primary" id="coNextStep2">مراجعة وتأكيد الطلب <i class="fa-solid fa-arrow-left"></i></button>
+            </div>
+          </div>
+
+          <!-- STEP 3: Order Summary & Placement -->
+          <div class="checkout-step-content" id="checkoutStep3">
+            <h3 class="checkout-step-title">مراجعة وتأكيد الطلب النهائي</h3>
+            
+            <div class="checkout-final-summary">
+              <div class="summary-box">
+                <h4><i class="fa-solid fa-map-pin"></i> عنوان التوصيل:</h4>
+                <p id="summaryAddressText">اسم العميل، العنوان، المحافظة</p>
+              </div>
+              <div class="summary-box">
+                <h4><i class="fa-solid fa-credit-card"></i> طريقة الدفع:</h4>
+                <p id="summaryPaymentText">الدفع عند الاستلام</p>
+              </div>
+              <div class="summary-box">
+                <h4><i class="fa-solid fa-receipt"></i> الفاتورة وتفاصيل الأسعار:</h4>
+                <div class="price-breakdown">
+                  <div class="price-row">
+                    <span>مجموع المنتجات:</span>
+                    <span id="coSubtotal">0 ج.م</span>
+                  </div>
+                  <div class="price-row text-gold" id="coDiscountRow" style="display: none;">
+                    <span>الخصم المطبق:</span>
+                    <span id="coDiscount">-0 ج.م</span>
+                  </div>
+                  <div class="price-row">
+                    <span>الشحن:</span>
+                    <span>مجاني</span>
+                  </div>
+                  <div class="price-row total-row">
+                    <span>المطلوب دفعه:</span>
+                    <span id="coTotal">0 ج.م</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="checkout-step-actions">
+              <button type="button" class="btn btn-outline" id="coPrevStep3"><i class="fa-solid fa-arrow-right"></i> تعديل الدفع</button>
+              <button type="submit" class="btn btn-primary flex-grow-1" id="coSubmitOrderBtn">تأكيد وشحن الطلب الآن! <i class="fa-solid fa-circle-check"></i></button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== INTERACTIVE PAYMENT GATEWAY MODAL ==================== -->
+  <div class="modal" id="paymentGateModal">
+    <div class="modal-backdrop" id="paymentGateBackdrop"></div>
+    <div class="payment-gate-content">
+      <button type="button" class="close-drawer-btn" id="closePaymentGateBtn" style="position: absolute; top: 15px; left: 15px; background: transparent; border: none; font-size: 1.25rem; cursor: pointer; color: var(--color-text-muted);" aria-label="إغلاق البوابة"><i class="fa-solid fa-xmark"></i></button>
+      <div id="paymentGateDynamicContainer"></div>
+    </div>
+  </div>
+
+  <!-- ==================== ORDER SUCCESS ANIMATION MODAL ==================== -->
+  <div class="modal" id="successModal">
+    <div class="modal-backdrop"></div>
+    <div class="success-modal-content">
+      <!-- Confetti items wrapper -->
+      <div class="confetti-container" id="confettiContainer"></div>
+      
+      <div class="success-animation-wrapper">
+        <div class="success-checkmark-circle">
+          <div class="success-checkmark-draw"></div>
+        </div>
+      </div>
+
+      <span class="success-subtitle">تم استقبال طلبك الفاخر بنجاح!</span>
+      <h2 class="success-title">طلب رقم <span id="coSuccessOrderNum">#VL-58472</span></h2>
+      <p class="success-desc">شكراً لك على ثقتك بـ <strong>Da Vinci Store</strong>. يقوم خبراء التغليف لدينا الآن بإعداد طلبك وسنتواصل معك قريباً للتأكيد.</p>
+      
+      <div class="success-actions">
+        <button id="closeSuccessBtn" class="btn btn-primary">العودة للرئيسية ومتابعة التسوق</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loaded Scripts -->
+  <script src="./products.js"></script>
+  <script src="./main.js"></script>
+</body>
+</html>
