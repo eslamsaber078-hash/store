@@ -429,14 +429,24 @@ app.put('/api/settings', authenticateToken, isAdmin, async (req, res) => {
         'announcement_text', 'announcement_enabled'
     ];
 
-    const upsert = (key, val) => new Promise((resolve, reject) => {
-        db.run(
-            `INSERT INTO settings (key, value) VALUES (?, ?)
-             ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
-            [key, String(val)],
-            err => err ? reject(err) : resolve()
-        );
-    });
+    const upsert = (key, val) => {
+        return new Promise((resolve, reject) => {
+            db.get("SELECT key FROM settings WHERE key = ?", [key], (err, row) => {
+                if (err) return reject(err);
+                if (row) {
+                    db.run("UPDATE settings SET value = ? WHERE key = ?", [String(val), key], err2 => {
+                        if (err2) reject(err2);
+                        else resolve();
+                    });
+                } else {
+                    db.run("INSERT INTO settings (key, value) VALUES (?, ?)", [key, String(val)], err2 => {
+                        if (err2) reject(err2);
+                        else resolve();
+                    });
+                }
+            });
+        });
+    };
 
     try {
         const updates = [];
