@@ -279,6 +279,26 @@ accountForm.addEventListener('submit', async (e) => {
 });
 
 // --- Settings Management ---
+function addAnnouncementRow(text = '') {
+    const container = document.getElementById('announcementRowsContainer');
+    if (!container) return;
+    const row = document.createElement('div');
+    row.className = 'announcement-row';
+    row.style.display = 'flex';
+    row.style.gap = '10px';
+    row.style.alignItems = 'center';
+    row.innerHTML = `
+        <input type="text" class="announcement-input-val form-control" style="flex:1; background:var(--color-bg-tertiary); border:1px solid var(--color-border); border-radius:var(--radius-sm); padding:10px; color:#fff;" placeholder="مثال: 🚚 شحن مجاني للطلبات أكثر من 3,000 ج.م" value="${text.replace(/"/g, '&quot;')}">
+        <button type="button" class="btn btn-outline" style="color:var(--color-danger); border-color:rgba(239, 68, 68, 0.4); padding:9px 12px; border-radius:var(--radius-sm);" onclick="this.parentElement.remove()">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
+    `;
+    container.appendChild(row);
+}
+
+// Make it globally accessible for inline onclick
+window.addAnnouncementRow = addAnnouncementRow;
+
 async function fetchSettings() {
     try {
         const res  = await fetch(`${API_URL}/settings`);
@@ -292,15 +312,35 @@ async function fetchSettings() {
             document.getElementById('setCod').checked = (data.cash_on_delivery_enabled === 'true');
 
         // Announcement fields
-        const annText    = document.getElementById('setAnnouncementText');
         const annEnabled = document.getElementById('setAnnouncementEnabled');
-        if (annText    && data.announcement_text    !== undefined) annText.value       = data.announcement_text;
-        if (annEnabled && data.announcement_enabled !== undefined) annEnabled.checked  = (data.announcement_enabled === 'true');
+        if (annEnabled && data.announcement_enabled !== undefined) {
+            annEnabled.checked = (data.announcement_enabled === 'true');
+        }
+
+        const container = document.getElementById('announcementRowsContainer');
+        if (container) {
+            container.innerHTML = '';
+            let texts = [];
+            if (data.announcement_text) {
+                try {
+                    texts = JSON.parse(data.announcement_text);
+                    if (!Array.isArray(texts)) texts = [data.announcement_text];
+                } catch(e) {
+                    texts = data.announcement_text.split('|').map(t => t.trim()).filter(Boolean);
+                }
+            }
+            if (texts.length === 0) {
+                addAnnouncementRow('');
+            } else {
+                texts.forEach(t => addAnnouncementRow(t));
+            }
+        }
     } catch(err) { console.error(err); }
 }
 
 async function saveAnnouncementSettings() {
-    const text    = document.getElementById('setAnnouncementText').value.trim();
+    const inputs = document.querySelectorAll('.announcement-input-val');
+    const texts = Array.from(inputs).map(inp => inp.value.trim()).filter(Boolean);
     const enabled = document.getElementById('setAnnouncementEnabled').checked;
     const feedback = document.getElementById('announcementFeedback');
 
@@ -308,11 +348,14 @@ async function saveAnnouncementSettings() {
         const res = await fetch(`${API_URL}/settings`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
-            body: JSON.stringify({ announcement_text: text, announcement_enabled: enabled.toString() })
+            body: JSON.stringify({ 
+                announcement_text: JSON.stringify(texts), 
+                announcement_enabled: enabled.toString() 
+            })
         });
         if (res.ok) {
             feedback.style.color = 'var(--color-success)';
-            feedback.textContent = '✅ تم حفظ الإعلان بنجاح';
+            feedback.textContent = '✅ تم حفظ الإعلانات بنجاح';
         } else {
             const d = await res.json();
             if (res.status === 401 || res.status === 403) { forceLogout(); return; }
@@ -326,19 +369,21 @@ async function saveAnnouncementSettings() {
 }
 
 async function clearAnnouncement() {
-    if (!confirm('هل تريد حذف نص الإعلان وإخفاء الشريط؟')) return;
+    if (!confirm('هل تريد حذف جميع الإعلانات وإخفاء الشريط؟')) return;
     const feedback = document.getElementById('announcementFeedback');
     try {
         const res = await fetch(`${API_URL}/settings`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
-            body: JSON.stringify({ announcement_text: '', announcement_enabled: 'false' })
+            body: JSON.stringify({ announcement_text: '[]', announcement_enabled: 'false' })
         });
         if (res.ok) {
-            document.getElementById('setAnnouncementText').value = '';
+            const container = document.getElementById('announcementRowsContainer');
+            if (container) container.innerHTML = '';
+            addAnnouncementRow('');
             document.getElementById('setAnnouncementEnabled').checked = false;
             feedback.style.color = 'var(--color-success)';
-            feedback.textContent = '✅ تم حذف الإعلان';
+            feedback.textContent = '✅ تم حذف جميع الإعلانات';
         } else if (res.status === 401 || res.status === 403) { forceLogout(); return; }
     } catch(err) { feedback.textContent = 'خطأ في الاتصال'; }
     setTimeout(() => { feedback.textContent = ''; }, 3500);

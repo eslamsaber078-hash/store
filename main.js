@@ -222,35 +222,60 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!bar) return;
 
     const enabled = settings.announcement_enabled !== 'false';
-    const text    = (settings.announcement_text || '').trim();
+    const textVal = (settings.announcement_text || '').trim();
 
     // If disabled by admin OR no text OR user already closed it this session
-    if (!enabled || !text || sessionStorage.getItem('announcementClosed') === '1') {
+    if (!enabled || !textVal || sessionStorage.getItem('announcementClosed') === '1') {
         bar.classList.add('hidden');
         return;
     }
 
-    // Update both ticker spans with new text (safely — no innerHTML from user input)
-    const items = bar.querySelectorAll('.announcement-item');
-    items.forEach(item => {
-        // Preserve icons — only update the text node
-        item.childNodes.forEach(node => {
-            if (node.nodeType === Node.TEXT_NODE) node.textContent = '';
-        });
-        // Rebuild inner content safely
-        item.textContent = '';
-        const icon1 = document.createElement('i');
-        icon1.className = 'fa-solid fa-truck-fast announcement-icon';
-        const div   = document.createElement('span');
-        div.className = 'announcement-divider';
-        div.textContent = '|';
-        const icon2 = document.createElement('i');
-        icon2.className = 'fa-solid fa-tag announcement-icon';
-        item.appendChild(icon1);
-        item.appendChild(document.createTextNode(' ' + text + ' '));
-        item.appendChild(div);
-        item.appendChild(icon2);
-    });
+    let texts = [];
+    try {
+        texts = JSON.parse(textVal);
+        if (!Array.isArray(texts)) texts = [textVal];
+    } catch (e) {
+        texts = textVal.split('|').map(t => t.trim()).filter(Boolean);
+    }
+
+    if (texts.length === 0) {
+        bar.classList.add('hidden');
+        return;
+    }
+
+    // Now render these announcements side-by-side in the marquee!
+    const track = document.getElementById('announcementTrack');
+    if (track) {
+        const html = texts.map((t) => {
+            let icon = 'fa-bullhorn';
+            const lowerT = t.toLowerCase();
+            if (lowerT.includes('شحن') || lowerT.includes('توصيل') || lowerT.includes('🚚')) {
+                icon = 'fa-truck-fast';
+            } else if (lowerT.includes('كود') || lowerT.includes('خصم') || lowerT.includes('كوبون') || lowerT.includes('🏷️')) {
+                icon = 'fa-tag';
+            } else if (lowerT.includes('هدية') || lowerT.includes('🎁')) {
+                icon = 'fa-gift';
+            } else if (lowerT.includes('عرض') || lowerT.includes('🔥')) {
+                icon = 'fa-fire';
+            }
+            
+            // Format promo code badge if there is a code like DAVINCI10
+            let formattedText = t;
+            const promoRegex = /(DAVINCI10|[A-Z]{3,}\d{2,})/g;
+            formattedText = formattedText.replace(promoRegex, match => `<span class="promo-code-badge">${match}</span>`);
+
+            return `
+              <span class="announcement-item">
+                <i class="fa-solid ${icon} announcement-icon"></i>
+                <span>${formattedText}</span>
+                <span class="announcement-divider">|</span>
+              </span>
+            `;
+        }).join("");
+
+        // Double for seamless marquee loop
+        track.innerHTML = html + html;
+    }
 
     bar.classList.remove('hidden');
 
@@ -563,7 +588,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Draw cart items list
     elements.cartItemsList.innerHTML = cart.map((item, index) => {
-      const prod = products.find(p => Number(p.id) === Number(item.productId));
+      const prod = products.find(p => String(p.id) === String(item.productId));
       if (!prod) return "";
 
       return `
@@ -593,7 +618,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function calculateCartTotals() {
     const subtotal = cart.reduce((sum, item) => {
-      const prod = products.find(p => Number(p.id) === Number(item.productId));
+      const prod = products.find(p => String(p.id) === String(item.productId));
       return sum + (prod ? prod.price * item.quantity : 0);
     }, 0);
 
@@ -638,8 +663,7 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   window.vogueQuickAddToCart = (productId) => {
-    productId = Number(productId);
-    const prod = products.find(p => p.id === productId);
+    const prod = products.find(p => String(p.id) === String(productId));
     if (!prod) return;
 
     // Pick first size and first color as default for quick-buy
@@ -654,10 +678,9 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   function addToCart(productId, size, color, quantity) {
-    productId = Number(productId);
     // Check if item already exists in cart with same color and size
     const existingIndex = cart.findIndex(item => 
-      Number(item.productId) === productId && 
+      String(item.productId) === String(productId) && 
       item.size === size && 
       (item.color && color ? item.color.name === color.name : item.color === color)
     );
@@ -675,10 +698,10 @@ document.addEventListener("DOMContentLoaded", () => {
     updateCartUI();
   }
 
-  // --- WISHLIST OPERATIONS ---
+  // ─── WISHLIST OPERATIONS ───
   function updateWishlistUI() {
-    // Ensure all wishlist entries are stored as Numbers and exist in the products list
-    wishlist = wishlist.map(Number).filter(id => !isNaN(id) && products.some(p => Number(p.id) === id));
+    // Ensure all wishlist entries exist in the products list
+    wishlist = wishlist.filter(id => products.some(p => String(p.id) === String(id)));
     localStorage.setItem("davinci_store_wishlist", JSON.stringify(wishlist));
     
     // Update count badges
@@ -697,7 +720,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Draw wishlist items list
     elements.wishlistItemsList.innerHTML = wishlist.map((id) => {
-      const prod = products.find(p => Number(p.id) === Number(id));
+      const prod = products.find(p => String(p.id) === String(id));
       if (!prod) return "";
 
       return `
@@ -721,10 +744,9 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   window.vogueToggleWishlist = (productId) => {
-    productId = Number(productId);
-    const index = wishlist.indexOf(productId);
-    if (index > -1) {
-      wishlist.splice(index, 1);
+    const idx = wishlist.findIndex(id => String(id) === String(productId));
+    if (idx > -1) {
+      wishlist.splice(idx, 1);
     } else {
       wishlist.push(productId);
     }
@@ -734,8 +756,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // --- QUICK VIEW ACTIONS ---
   window.vogueOpenQuickView = (productId) => {
-    productId = Number(productId);
-    const prod = products.find(p => p.id === productId);
+    const prod = products.find(p => String(p.id) === String(productId));
     if (!prod) return;
 
     qvSelectedProduct = prod;
@@ -1636,7 +1657,7 @@ document.addEventListener("DOMContentLoaded", () => {
       });
 
       const subtotal = cart.reduce((sum, item) => {
-        const prod = products.find(p => Number(p.id) === Number(item.productId));
+        const prod = products.find(p => String(p.id) === String(item.productId));
         return sum + (prod ? prod.price * item.quantity : 0);
       }, 0);
 
@@ -1658,7 +1679,7 @@ document.addEventListener("DOMContentLoaded", () => {
           discount: discount,
           total: total,
           items: cart.map(item => {
-              const p = products.find(prod => Number(prod.id) === Number(item.productId));
+              const p = products.find(prod => String(prod.id) === String(item.productId));
               return {
                   name: p ? p.name : 'منتج غير معروف',
                   quantity: item.quantity,

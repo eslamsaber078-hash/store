@@ -114,16 +114,23 @@
             </label>
           </div>
           <div class="form-group mt-3">
-            <label>نص الإعلان</label>
-            <textarea id="setAnnouncementText" rows="3" placeholder="مثال: 🚚 شحن مجاني للطلبات أكثر من 3,000 ج.م | كود DAVINCI10 خصم 10%" style="resize:vertical;"></textarea>
-            <small style="color:var(--color-text-muted);font-size:0.78rem;margin-top:6px;display:block;">يمكنك استخدام رموز تعبيرية 🚚 🎁 💥 وكود الخصم في النص</small>
+            <label style="display:flex; justify-content:space-between; align-items:center; width:100%; margin-bottom:10px;">
+              <span style="font-weight:600;">نصوص الإعلانات النشطة</span>
+              <button type="button" class="btn btn-outline" style="padding:4px 10px; font-size:0.8rem; border-color:var(--color-gold); color:var(--color-gold);" onclick="addAnnouncementRow('')">
+                <i class="fa-solid fa-plus"></i> إضافة إعلان آخر
+              </button>
+            </label>
+            <div id="announcementRowsContainer" style="display:flex; flex-direction:column; gap:10px;">
+              <!-- Rows added dynamically via JS -->
+            </div>
+            <small style="color:var(--color-text-muted);font-size:0.78rem;margin-top:6px;display:block;">ستظهر هذه الإعلانات متتالية ومتحركة في الشريط العلوي للموقع.</small>
           </div>
           <div class="mt-3">
             <button type="button" class="btn btn-primary" onclick="saveAnnouncementSettings()">
-              حفظ الإعلان <i class="fa-solid fa-bullhorn"></i>
+              حفظ الإعلانات <i class="fa-solid fa-save"></i>
             </button>
-            <button type="button" class="btn btn-outline" style="margin-right:10px;" onclick="clearAnnouncement()">
-              حذف الإعلان <i class="fa-solid fa-trash"></i>
+            <button type="button" class="btn btn-outline" style="margin-right:10px; color:var(--color-danger); border-color:rgba(239,68,68,0.3);" onclick="clearAnnouncement()">
+              حذف الكل <i class="fa-solid fa-trash"></i>
             </button>
             <span id="announcementFeedback" class="feedback-msg"></span>
           </div>
