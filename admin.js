@@ -60,8 +60,8 @@ function forceLogout() {
     hideSessionWarning();
 }
 
-// Reset timer on any user activity
-['mousemove', 'keydown', 'mousedown', 'touchstart', 'scroll'].forEach(evt => {
+// Reset timer only on actual interaction/work events (no mousemove to avoid accidental extensions)
+['click', 'keydown', 'input', 'change', 'submit', 'touchstart'].forEach(evt => {
     document.addEventListener(evt, resetSessionTimer, { passive: true });
 });
 
