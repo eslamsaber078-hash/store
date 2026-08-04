@@ -38,7 +38,22 @@
   </div>
 
   <!-- ==================== ADMIN DASHBOARD ==================== -->
+
   <div id="adminDashboard" class="admin-dashboard-layout" style="display: none;">
+
+    <!-- Mobile Topbar (visible only on mobile/tablet) -->
+    <header class="admin-mobile-topbar">
+      <div class="brand-logo" style="font-size:1rem;">
+        <span class="logo-accent">DA</span><span class="logo-main"> ADMIN</span>
+      </div>
+      <button id="adminSidebarToggle" class="admin-mobile-toggle" aria-label="فتح القائمة">
+        <i class="fa-solid fa-bars"></i>
+      </button>
+    </header>
+
+    <!-- Sidebar Backdrop (mobile) -->
+    <div class="admin-sidebar-backdrop" id="adminSidebarBackdrop"></div>
+
     <!-- Sidebar -->
     <aside class="admin-sidebar">
       <div class="brand-logo mb-5">
@@ -67,7 +82,9 @@
             <button class="btn btn-secondary" onclick="fetchOrders()"><i class="fa-solid fa-rotate-right"></i> تحديث</button>
           </div>
         </div>
-        <div class="table-responsive">
+
+        <!-- Desktop Table View -->
+        <div class="table-responsive desktop-orders-view">
           <table class="admin-table">
             <thead>
               <tr>
@@ -84,6 +101,11 @@
               <!-- Rendered via JS -->
             </tbody>
           </table>
+        </div>
+
+        <!-- Mobile Card Grid View (No horizontal scrolling!) -->
+        <div class="orders-mobile-grid mobile-orders-view" id="ordersMobileGrid">
+          <!-- Rendered via JS -->
         </div>
       </section>
 

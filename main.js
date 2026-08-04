@@ -664,8 +664,12 @@ document.addEventListener("DOMContentLoaded", () => {
     addToCart(productId, size, color, 1);
     
     // Open cart drawer immediately to show additions
-    elements.cartDrawer.classList.add("active");
-    elements.drawerOverlay.classList.add("active");
+    if (typeof window.vogueOpenDrawer === 'function') {
+      window.vogueOpenDrawer(elements.cartDrawer);
+    } else {
+      elements.cartDrawer.classList.add("active");
+      elements.drawerOverlay.classList.add("active");
+    }
   };
 
   function addToCart(productId, size, color, quantity) {
@@ -1029,54 +1033,86 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
 
-    // Mobile Navbar drawer controls
-    elements.mobileMenuBtn.addEventListener("click", () => {
-      elements.mobileDrawer.classList.add("active");
-      elements.drawerOverlay.classList.add("active");
-    });
-    
-    const closeDrawers = () => {
-      elements.mobileDrawer.classList.remove("active");
-      elements.cartDrawer.classList.remove("active");
-      elements.wishlistDrawer.classList.remove("active");
-      elements.filterSidebar.classList.remove("active");
-      elements.drawerOverlay.classList.remove("active");
+    // ─── MOBILE BACK BUTTON (HISTORY API INTEGRATION) ───
+    let isHistoryPushed = false;
+
+    const pushModalHistory = () => {
+      if (!isHistoryPushed) {
+        history.pushState({ modalOpen: true }, "");
+        isHistoryPushed = true;
+      }
     };
 
-    elements.closeMobileDrawer.addEventListener("click", closeDrawers);
-    elements.drawerOverlay.addEventListener("click", closeDrawers);
+    const openDrawerElement = (el) => {
+      if (!el) return;
+      el.classList.add("active");
+      if (elements.drawerOverlay) elements.drawerOverlay.classList.add("active");
+      document.body.style.overflow = "hidden";
+      pushModalHistory();
+    };
+
+    const closeDrawers = (fromPopstate = false) => {
+      const activeElements = document.querySelectorAll(
+        ".cart-drawer.active, .wishlist-drawer.active, .mobile-drawer.active, .filter-sidebar.active, .quick-view-modal.active, .checkout-modal.active, .success-modal.active, .payment-gate-modal.active, .drawer-overlay.active"
+      );
+
+      activeElements.forEach(el => el.classList.remove("active"));
+      document.body.style.overflow = "";
+
+      if (isHistoryPushed) {
+        isHistoryPushed = false;
+        if (fromPopstate !== true) {
+          try { history.back(); } catch(e) {}
+        }
+      }
+    };
+
+    window.addEventListener("popstate", () => {
+      if (isHistoryPushed) {
+        closeDrawers(true);
+      }
+    });
+
+    // Make openDrawerElement globally accessible within main scope
+    window.vogueOpenDrawer = openDrawerElement;
+    window.vogueCloseDrawers = closeDrawers;
+
+    // Mobile Navbar drawer controls
+    elements.mobileMenuBtn.addEventListener("click", () => {
+      openDrawerElement(elements.mobileDrawer);
+    });
+
+    elements.closeMobileDrawer.addEventListener("click", () => closeDrawers());
+    elements.drawerOverlay.addEventListener("click", () => closeDrawers());
 
     // Cart drawer toggles
     const cartTriggers = document.querySelectorAll(".cart-trigger");
     cartTriggers.forEach(btn => {
       btn.addEventListener("click", () => {
-        elements.cartDrawer.classList.add("active");
-        elements.drawerOverlay.classList.add("active");
+        openDrawerElement(elements.cartDrawer);
       });
     });
-    elements.closeCartBtn.addEventListener("click", closeDrawers);
-    elements.startShoppingBtn.addEventListener("click", closeDrawers);
+    elements.closeCartBtn.addEventListener("click", () => closeDrawers());
+    elements.startShoppingBtn.addEventListener("click", () => closeDrawers());
 
     // Wishlist drawer toggles
     if (elements.wishlistToggleBtn) {
       elements.wishlistToggleBtn.addEventListener("click", () => {
-        elements.wishlistDrawer.classList.add("active");
-        elements.drawerOverlay.classList.add("active");
+        openDrawerElement(elements.wishlistDrawer);
       });
     }
     if (elements.closeWishlistBtn) {
-      elements.closeWishlistBtn.addEventListener("click", closeDrawers);
+      elements.closeWishlistBtn.addEventListener("click", () => closeDrawers());
     }
     if (elements.wishlistStartShoppingBtn) {
-      elements.wishlistStartShoppingBtn.addEventListener("click", closeDrawers);
+      elements.wishlistStartShoppingBtn.addEventListener("click", () => closeDrawers());
     }
 
     // Mobile Filter Sidebar Toggle
     elements.mobileFilterToggleBtn.addEventListener("click", () => {
-      elements.filterSidebar.classList.add("active");
-      elements.drawerOverlay.classList.add("active");
+      openDrawerElement(elements.filterSidebar);
     });
-    elements.closeFilterSidebar.addEventListener("click", closeDrawers);
+    elements.closeFilterSidebar.addEventListener("click", () => closeDrawers());
 
     // Hero Slider dot navigation clicks
     elements.dots.forEach(dot => {
@@ -1272,6 +1308,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     // Modal Close operations
+    const closeQuickView = () => closeDrawers();
     elements.closeQuickViewBtn.addEventListener("click", closeQuickView);
     elements.quickViewBackdrop.addEventListener("click", closeQuickView);
 
@@ -1282,21 +1319,13 @@ document.addEventListener("DOMContentLoaded", () => {
       
       addToCart(qvSelectedProduct.id, qvSelectedSize, qvSelectedColor, qty);
       closeQuickView();
-
-      // Show Cart Drawer feedback
-      elements.cartDrawer.classList.add("active");
-      elements.drawerOverlay.classList.add("active");
+      openDrawerElement(elements.cartDrawer);
     });
 
     // Checkout Modal open click
     elements.checkoutBtn.addEventListener("click", () => {
       closeDrawers();
       showCheckoutStep(1);
-      elements.checkoutModal.classList.add("active");
-      document.body.style.overflow = "hidden";
-    });
-
-    const closeCheckout = () => {
       elements.checkoutModal.classList.remove("active");
       document.body.style.overflow = "auto";
     };

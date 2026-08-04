@@ -35,11 +35,62 @@
 .mt-4 { margin-top: 25px; }
 .auth-error { color: var(--color-danger); font-size: 0.85rem; text-align: center; }
 
-/* Dashboard Layout */
+/* ==========================================================================
+   DASHBOARD LAYOUT
+   ========================================================================== */
 .admin-dashboard-layout {
     display: flex;
     min-height: 100vh;
 }
+
+/* ── Mobile Topbar — Hidden by default on desktop ── */
+.admin-mobile-topbar {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 60px;
+    background: var(--color-bg-secondary);
+    border-bottom: 1px solid var(--color-border);
+    padding: 0 20px;
+    align-items: center;
+    justify-content: space-between;
+    z-index: 1000;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+}
+.admin-mobile-toggle {
+    background: var(--color-bg-tertiary);
+    border: 1px solid var(--color-border);
+    color: var(--color-gold);
+    width: 42px;
+    height: 42px;
+    border-radius: var(--radius-md);
+    font-size: 1.2rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+}
+.admin-mobile-toggle:hover {
+    background: var(--color-gold-light);
+}
+
+/* ── Sidebar Backdrop (mobile only) ── */
+.admin-sidebar-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 998;
+    background: rgba(0,0,0,0.55);
+    backdrop-filter: blur(2px);
+}
+.admin-sidebar-backdrop.active {
+    display: block;
+}
+
+/* ── Sidebar ── */
 .admin-sidebar {
     width: 280px;
     background-color: var(--color-bg-secondary);
@@ -51,6 +102,7 @@
     right: 0;
     top: 0;
     height: 100vh;
+    z-index: 100;
 }
 .admin-nav {
     list-style: none;
@@ -83,6 +135,7 @@
     border-right: 3px solid var(--color-gold);
 }
 
+/* ── Main Content ── */
 .admin-main-content {
     flex-grow: 1;
     margin-right: 280px;
@@ -97,7 +150,9 @@
     padding-bottom: 15px;
 }
 
-/* Tables */
+/* ==========================================================================
+   TABLES
+   ========================================================================== */
 .table-responsive {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
@@ -134,7 +189,9 @@
 .status-cancelled { background-color: rgba(255, 69, 58, 0.15); color: #ff453a; }
 .status-verification { background-color: rgba(249, 115, 22, 0.15); color: #f97316; }
 
-/* Admin Cards */
+/* ==========================================================================
+   ADMIN CARDS
+   ========================================================================== */
 .admin-card {
     background-color: var(--color-bg-secondary);
     border: 1px solid var(--color-border);
@@ -144,7 +201,6 @@
 }
 .admin-card.mb-4 { margin-bottom: 30px; }
 
-/* Card header with title + toggle */
 .admin-card-header {
     display: flex;
     align-items: center;
@@ -206,8 +262,9 @@
     background: var(--color-gold);
 }
 
-
-/* Products Grid */
+/* ==========================================================================
+   PRODUCTS GRID
+   ========================================================================== */
 .products-grid-admin {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
@@ -241,215 +298,106 @@
 }
 
 /* ==========================================================================
-   RESPONSIVE — TABLETS (1024px) 
+   MOBILE ORDERS CARD GRID
    ========================================================================== */
-@media (max-width: 1024px) {
-    .admin-sidebar {
-        width: 220px;
-    }
-    .admin-main-content {
-        margin-right: 220px;
-        padding: 30px 25px;
-    }
-    .products-grid-admin {
-        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    }
+.orders-mobile-grid {
+    display: none;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.admin-order-card-mobile {
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: 18px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.order-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    padding-bottom: 10px;
+}
+
+.order-num {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.95rem;
+}
+
+.order-card-body {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    font-size: 0.88rem;
+}
+
+.order-meta-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+}
+
+.meta-label {
+    color: var(--color-text-muted);
+    font-size: 0.82rem;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.meta-val {
+    color: var(--color-text-primary);
+    font-weight: 500;
+    text-align: left;
+}
+
+.order-card-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    padding-top: 12px;
+    margin-top: 4px;
+}
+
+.order-total-pill {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(212,175,55,0.12);
+    border: 1px solid rgba(212,175,55,0.35);
+    padding: 6px 14px;
+    border-radius: 20px;
+    color: var(--color-gold);
+    font-size: 0.88rem;
+}
+
+.order-actions {
+    display: flex;
+    gap: 8px;
+}
+.order-actions .btn {
+    padding: 7px 14px;
+    font-size: 0.8rem;
+    border-radius: var(--radius-sm);
+}
+.order-actions .btn.danger {
+    color: var(--color-danger);
+    border-color: rgba(239, 68, 68, 0.4);
 }
 
 /* ==========================================================================
-   RESPONSIVE LAYOUT FOR MOBILE & TABLETS (<= 768px)
+   COLOR PICKER WIDGET
    ========================================================================== */
-@media (max-width: 768px) {
-    .admin-dashboard-layout {
-        flex-direction: column;
-    }
-    .admin-sidebar {
-        position: static;
-        width: 100%;
-        height: auto;
-        padding: 12px 15px;
-        border-left: none;
-        border-bottom: 1px solid var(--color-border);
-        display: grid;
-        grid-template-columns: 1fr auto;
-        align-items: center;
-        gap: 10px;
-    }
-    .admin-sidebar .brand-logo.mb-5 {
-        margin-bottom: 0 !important;
-    }
-    .admin-nav {
-        grid-column: span 2;
-        display: flex;
-        flex-direction: row;
-        overflow-x: auto;
-        gap: 6px;
-        padding-bottom: 4px;
-        margin-bottom: 0;
-        -webkit-overflow-scrolling: touch;
-        scrollbar-width: none;
-    }
-    /* Hide scrollbar for nav list */
-    .admin-nav::-webkit-scrollbar {
-        height: 3px;
-    }
-    .admin-nav li {
-        margin-bottom: 0;
-        flex-shrink: 0;
-    }
-    .admin-nav-btn {
-        padding: 9px 13px;
-        font-size: 0.82rem;
-        white-space: nowrap;
-        gap: 6px;
-    }
-    .admin-nav-btn i {
-        font-size: 0.9rem;
-    }
-    .admin-nav-btn.active {
-        border-right: none;
-        border-bottom: 3px solid var(--color-gold);
-    }
-    .admin-sidebar-footer {
-        grid-column: 2;
-        grid-row: 1;
-    }
-    #logoutBtn {
-        padding: 8px 12px;
-        font-size: 0.8rem;
-        white-space: nowrap;
-    }
-    .admin-main-content {
-        margin-right: 0;
-        padding: 20px 15px;
-    }
-    .section-header {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 12px;
-    }
-    .section-header h2 {
-        font-size: 1.3rem;
-    }
-    .section-header .btn {
-        width: 100%;
-        text-align: center;
-        justify-content: center;
-    }
-
-    /* Admin product modal — full screen sheet on mobile */
-    #productModal.active .checkout-modal-content,
-    #orderModal.active .checkout-modal-content {
-        max-height: 95dvh;
-    }
-
-    /* Product form fields — all full width on mobile */
-    .form-group.col-6 {
-        grid-column: span 12;
-    }
-
-    /* Admin products grid — 2 columns */
-    .products-grid-admin {
-        grid-template-columns: repeat(2, 1fr);
-        gap: 12px;
-    }
-    .admin-product-img {
-        height: 140px;
-    }
-    .admin-product-info {
-        padding: 10px;
-    }
-    .admin-product-info h4 {
-        font-size: 0.88rem;
-    }
-    .admin-product-actions {
-        padding: 10px;
-        gap: 6px;
-    }
-    .admin-product-actions .btn {
-        font-size: 0.8rem;
-        padding: 5px 8px;
-    }
-
-    /* Stats cards */
-    .stats-container {
-        grid-template-columns: repeat(2, 1fr);
-        gap: 12px;
-    }
-    .stat-card {
-        padding: 15px;
-    }
-    .stat-value {
-        font-size: 1.6rem;
-    }
-
-    /* Admin card padding */
-    .admin-card {
-        padding: 20px 15px;
-    }
-
-    /* Orders table — smaller text */
-    .admin-table th,
-    .admin-table td {
-        padding: 10px 8px;
-        font-size: 0.8rem;
-    }
-    .admin-table th:nth-child(5),
-    .admin-table td:nth-child(5) {
-        display: none; /* hide payment method on mobile */
-    }
-}
-
-@media (max-width: 480px) {
-    .admin-nav-btn {
-        padding: 8px 10px;
-        font-size: 0.78rem;
-        gap: 5px;
-    }
-    /* Stats 1 column on very small screens */
-    .stats-container {
-        grid-template-columns: 1fr;
-    }
-    /* Products grid — 1 column on very small screens */
-    .products-grid-admin {
-        grid-template-columns: 1fr;
-    }
-    .admin-product-img {
-        height: 160px;
-    }
-    /* Table minimal */
-    .admin-table th,
-    .admin-table td {
-        padding: 8px 6px;
-        font-size: 0.75rem;
-    }
-    /* Auth card */
-    .auth-card {
-        padding: 25px 18px;
-        border-radius: var(--radius-md);
-    }
-    /* Section header */
-    .section-header h2 {
-        font-size: 1.15rem;
-    }
-}
-
-/* Very small phones (360px) */
-@media (max-width: 360px) {
-    .admin-main-content {
-        padding: 15px 10px;
-    }
-    .admin-nav-btn {
-        padding: 7px 9px;
-        font-size: 0.72rem;
-    }
-    .admin-table th:nth-child(3),
-    .admin-table td:nth-child(3) {
-        display: none; /* hide governorate/city on extremely small screens */
-    }
-}
-
-/* ========== Color Picker Widget ========== */
 .color-picker-widget {
     background: var(--color-bg-tertiary);
     border: 1px solid var(--color-border);
@@ -538,103 +486,163 @@
     transition: background 0.2s;
 }
 
+/* ==========================================================================
+   RESPONSIVE — TABLETS (≤ 1024px)
+   ========================================================================== */
+@media (max-width: 1024px) {
+    .admin-sidebar {
+        width: 240px;
+    }
+    .admin-main-content {
+        margin-right: 240px;
+        padding: 30px 25px;
+    }
+    .products-grid-admin {
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
     }
 }
 
-@media (max-width: 480px) {
-    .admin-table th, .admin-table td {
-        padding: 12px 8px;
-        font-size: 0.8rem;
+/* ==========================================================================
+   RESPONSIVE — MOBILE (≤ 768px)
+   Sidebar becomes a hidden drawer; topbar with hamburger appears
+   ========================================================================== */
+@media (max-width: 768px) {
+
+    /* ── Layout ── */
+    .admin-dashboard-layout {
+        flex-direction: column;
+        padding-top: 60px;
     }
-    .admin-card {
+
+    /* ── Show Mobile Topbar ── */
+    .admin-mobile-topbar {
+        display: flex !important;
+    }
+
+    /* ── Sidebar → Slide-in Drawer ── */
+    .admin-sidebar {
+        position: fixed;
+        top: 60px;
+        right: -300px;
+        width: 280px;
+        height: calc(100vh - 60px);
+        z-index: 999;
+        transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: -10px 0 30px rgba(0,0,0,0.7);
+        border-left: 1px solid var(--color-border);
+        padding: 20px 16px;
+    }
+    .admin-sidebar.active {
+        right: 0;
+    }
+
+    /* ── Sidebar Backdrop ── */
+    .admin-sidebar-backdrop {
+        display: none;
+    }
+    .admin-sidebar-backdrop.active {
+        display: block;
+    }
+
+    /* ── Nav (vertical in drawer) ── */
+    .admin-nav {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        overflow-y: auto;
+        flex-grow: 1;
+        margin-bottom: 16px;
+    }
+    .admin-nav li {
+        margin-bottom: 0;
+    }
+    .admin-nav-btn {
+        padding: 12px 16px;
+        font-size: 0.95rem;
+        white-space: nowrap;
+    }
+    .admin-nav-btn.active {
+        border-right: 3px solid var(--color-gold);
+        border-bottom: none;
+    }
+
+    /* ── Main Content ── */
+    .admin-main-content {
+        margin-right: 0;
         padding: 20px 15px;
     }
+    .section-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+    .section-header h2 {
+        font-size: 1.3rem;
+    }
+    .section-header .btn {
+        width: 100%;
+        text-align: center;
+        justify-content: center;
+    }
+
+    /* ── Orders: hide table, show cards ── */
+    .desktop-orders-view {
+        display: none !important;
+    }
+    .orders-mobile-grid {
+        display: flex !important;
+    }
+
+    /* ── Products Grid — 2 columns ── */
+    .products-grid-admin {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+    }
+    .admin-product-img { height: 140px; }
+    .admin-product-info { padding: 10px; }
+    .admin-product-info h4 { font-size: 0.88rem; }
+    .admin-product-actions { padding: 10px; gap: 6px; }
+    .admin-product-actions .btn { font-size: 0.8rem; padding: 5px 8px; }
+
+    /* ── Stats ── */
+    .stats-container {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+    }
+    .stat-card { padding: 15px; }
+    .stat-value { font-size: 1.6rem; }
+
+    /* ── Cards ── */
+    .admin-card { padding: 20px 15px; }
+
+    /* ── Modals ── */
+    #productModal.active .checkout-modal-content,
+    #orderModal.active .checkout-modal-content {
+        max-height: 95dvh;
+    }
+    .form-group.col-6 { grid-column: span 12; }
+    .form-grid { grid-template-columns: 1fr !important; }
+
+    /* ── Auth Card ── */
+    .auth-card {
+        padding: 25px 18px;
+        border-radius: var(--radius-md);
+    }
 }
 
-/* ========== Color Picker Widget ========== */
-.color-picker-widget {
-    background: var(--color-bg-tertiary);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    padding: 12px;
+/* ==========================================================================
+   VERY SMALL PHONES (≤ 480px)
+   ========================================================================== */
+@media (max-width: 480px) {
+    .stats-container { grid-template-columns: 1fr; }
+    .products-grid-admin { grid-template-columns: 1fr; }
+    .admin-product-img { height: 160px; }
+    .section-header h2 { font-size: 1.15rem; }
 }
 
-.color-swatches {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-bottom: 12px;
-}
-
-.color-swatch {
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    cursor: pointer;
-    transition: transform 0.15s, box-shadow 0.15s;
-    position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.7rem;
-    color: #fff;
-    font-weight: bold;
-    flex-shrink: 0;
-}
-
-.color-swatch:hover {
-    transform: scale(1.2);
-    box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.5);
-}
-
-.color-swatch.selected {
-    box-shadow: 0 0 0 3px var(--color-gold);
-    transform: scale(1.1);
-}
-
-.color-swatch-none {
-    color: #aaa;
-    font-size: 0.85rem;
-}
-
-.color-picker-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.color-native-picker {
-    width: 40px;
-    height: 36px;
-    border: none;
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-    padding: 2px;
-    background: transparent;
-    flex-shrink: 0;
-}
-
-.color-name-input {
-    flex: 1;
-    background: var(--color-bg-secondary);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-sm);
-    padding: 8px 10px;
-    color: var(--color-text-primary);
-    font-size: 0.9rem;
-    font-family: var(--font-primary);
-}
-
-.color-name-input:focus {
-    outline: none;
-    border-color: var(--color-gold);
-}
-
-.color-preview-dot {
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    border: 2px solid var(--color-border);
-    flex-shrink: 0;
-    transition: background 0.2s;
+/* ==========================================================================
+   TINY PHONES (≤ 360px)
+   ========================================================================== */
+@media (max-width: 360px) {
+    .admin-main-content { padding: 15px 10px; }
 }

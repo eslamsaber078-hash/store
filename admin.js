@@ -713,31 +713,92 @@ function getStatusBadge(status) {
 
 function renderOrders() {
     const tbody = document.getElementById('ordersTableBody');
-    tbody.innerHTML = '';
-    
+    const mobileGrid = document.getElementById('ordersMobileGrid');
+
+    if (tbody) tbody.innerHTML = '';
+    if (mobileGrid) mobileGrid.innerHTML = '';
+
     if (adminOrders.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" class="text-center">لا توجد طلبات بعد</td></tr>`;
+        if (tbody) tbody.innerHTML = `<tr><td colspan="7" class="text-center">لا توجد طلبات بعد</td></tr>`;
+        if (mobileGrid) mobileGrid.innerHTML = `<div class="admin-card text-center text-muted p-4">لا توجد طلبات بعد</div>`;
         return;
     }
-    
+
     adminOrders.forEach(o => {
         const date = new Date(o.created_at).toLocaleDateString('ar-EG');
-        tbody.innerHTML += `
-            <tr>
-                <td><strong>${o.order_number}</strong></td>
-                <td>${date}</td>
-                <td>${o.customer_name}</td>
-                <td class="text-gold font-bold">${o.total} ج.م</td>
-                <td>${getPaymentMethodName(o.payment_method)}</td>
-                <td>${getStatusBadge(o.status)}</td>
-                <td>
-                    <div style="display: flex; gap: 6px;">
-                        <button class="btn btn-outline" style="padding: 5px 8px; font-size: 0.85rem;" onclick="viewOrder(${o.id})" title="عرض التفاصيل"><i class="fa-solid fa-eye"></i> عرض</button>
-                        <button class="btn btn-secondary" style="padding: 5px 8px; font-size: 0.85rem; color: var(--color-danger); border-color: var(--color-danger);" onclick="deleteOrder(${o.id})" title="حذف الطلب"><i class="fa-solid fa-trash"></i></button>
+        const statusBadge = getStatusBadge(o.status);
+        const totalFormatted = (o.total || 0).toLocaleString('ar-EG');
+
+        if (tbody) {
+            tbody.innerHTML += `
+                <tr>
+                    <td><strong>${o.order_number}</strong></td>
+                    <td>${date}</td>
+                    <td>${o.customer_name}</td>
+                    <td class="text-gold font-bold">${totalFormatted} ج.م</td>
+                    <td>${getPaymentMethodName(o.payment_method)}</td>
+                    <td>${statusBadge}</td>
+                    <td>
+                        <div style="display: flex; gap: 6px;">
+                            <button class="btn btn-outline" style="padding: 5px 8px; font-size: 0.85rem;" onclick="viewOrder(${o.id})" title="عرض التفاصيل"><i class="fa-solid fa-eye"></i> عرض</button>
+                            <button class="btn btn-secondary" style="padding: 5px 8px; font-size: 0.85rem; color: var(--color-danger); border-color: var(--color-danger);" onclick="deleteOrder(${o.id})" title="حذف الطلب"><i class="fa-solid fa-trash"></i></button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }
+
+        if (mobileGrid) {
+            mobileGrid.innerHTML += `
+                <div class="admin-order-card-mobile">
+                    <div class="order-card-header">
+                        <div class="order-num">
+                            <i class="fa-solid fa-receipt text-gold"></i>
+                            <strong>${o.order_number}</strong>
+                        </div>
+                        <div class="order-status-wrapper">
+                            ${statusBadge}
+                        </div>
                     </div>
-                </td>
-            </tr>
-        `;
+                    <div class="order-card-body">
+                        <div class="order-meta-item">
+                            <span class="meta-label"><i class="fa-solid fa-user"></i> العميل:</span>
+                            <span class="meta-val">${o.customer_name}</span>
+                        </div>
+                        <div class="order-meta-item">
+                            <span class="meta-label"><i class="fa-solid fa-phone"></i> الهاتف:</span>
+                            <span class="meta-val"><a href="tel:${o.phone}" style="color:var(--color-gold);text-decoration:none;">${o.phone}</a></span>
+                        </div>
+                        <div class="order-meta-item">
+                            <span class="meta-label"><i class="fa-solid fa-location-dot"></i> العنوان:</span>
+                            <span class="meta-val">${o.governorate || ''} - ${o.city || ''} (${o.address || ''})</span>
+                        </div>
+                        <div class="order-meta-item">
+                            <span class="meta-label"><i class="fa-solid fa-credit-card"></i> طريقة الدفع:</span>
+                            <span class="meta-val">${getPaymentMethodName(o.payment_method)}</span>
+                        </div>
+                        <div class="order-meta-item">
+                            <span class="meta-label"><i class="fa-regular fa-calendar"></i> التاريخ:</span>
+                            <span class="meta-val">${date}</span>
+                        </div>
+                    </div>
+                    <div class="order-card-footer">
+                        <div class="order-total-pill">
+                            <span>المبلغ:</span>
+                            <strong>${totalFormatted} ج.م</strong>
+                        </div>
+                        <div class="order-actions">
+                            <button class="btn btn-outline" onclick="viewOrder(${o.id})">
+                                <i class="fa-solid fa-eye"></i> التفاصيل
+                            </button>
+                            <button class="btn btn-outline danger" onclick="deleteOrder(${o.id})">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
     });
 }
 
@@ -1009,3 +1070,40 @@ if (updateStatusBtn) {
 function closeOrderModal() {
     oModal.classList.remove('active');
 }
+
+// ── Mobile Sidebar Toggle Handler ──────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+    const sidebarToggle = document.getElementById('adminSidebarToggle');
+    const sidebar       = document.querySelector('.admin-sidebar');
+    const backdrop      = document.getElementById('adminSidebarBackdrop');
+
+    function openSidebar() {
+        sidebar.classList.add('active');
+        if (backdrop) backdrop.classList.add('active');
+        document.body.style.overflow = 'hidden';
+    }
+    function closeSidebar() {
+        sidebar.classList.remove('active');
+        if (backdrop) backdrop.classList.remove('active');
+        document.body.style.overflow = '';
+    }
+
+    if (sidebarToggle && sidebar) {
+        sidebarToggle.addEventListener('click', () => {
+            sidebar.classList.contains('active') ? closeSidebar() : openSidebar();
+        });
+        // Close when a nav item is tapped
+        document.querySelectorAll('.admin-nav-btn').forEach(btn => {
+            btn.addEventListener('click', () => closeSidebar());
+        });
+        // Close on backdrop tap
+        if (backdrop) {
+            backdrop.addEventListener('click', () => closeSidebar());
+        }
+        // Close on logout
+        const logoutButton = document.getElementById('logoutBtn');
+        if (logoutButton) {
+            logoutButton.addEventListener('click', () => closeSidebar());
+        }
+    }
+});
