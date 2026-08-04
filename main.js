@@ -211,6 +211,7 @@ document.addEventListener("DOMContentLoaded", () => {
     registerEventListeners();
     updateAuthStateUI();
     initGoogleSignIn();
+    initGovernorateSelect();
   }
 
   // ── Announcement Bar logic (2026 Next-Gen Marquee) ───────────────────────────
@@ -922,13 +923,30 @@ document.addEventListener("DOMContentLoaded", () => {
     const ln = document.getElementById("coLastName");
     const ph = document.getElementById("coPhone");
     const ad = document.getElementById("coAddress");
-    const gov = document.getElementById("coGovernorate");
+    const gov = document.getElementById("coGovernorate"); // hidden input
+    const govSearch = document.getElementById("coGovernorateSearch");
     const city = document.getElementById("coCity");
 
-    if (!fn.checkValidity() || !ln.checkValidity() || !ph.checkValidity() || !ad.checkValidity() || !gov.checkValidity() || !city.checkValidity()) {
-      fn.reportValidity() || ln.reportValidity() || ph.reportValidity() || ad.reportValidity() || gov.reportValidity() || city.reportValidity();
+    if (!fn.checkValidity()) { fn.reportValidity(); return false; }
+    if (!ln.checkValidity()) { ln.reportValidity(); return false; }
+    if (!ph.checkValidity()) { ph.reportValidity(); return false; }
+    if (!ad.checkValidity()) { ad.reportValidity(); return false; }
+
+    // Manual check for searchable governorate dropdown
+    if (!gov || !gov.value.trim()) {
+      if (govSearch) {
+        govSearch.style.borderColor = 'var(--color-danger)';
+        govSearch.placeholder = 'الرجاء اختيار المحافظة من القائمة';
+        setTimeout(() => {
+          govSearch.style.borderColor = '';
+          govSearch.placeholder = 'ابحث عن محافظتك...';
+        }, 3000);
+        govSearch.focus();
+      }
       return false;
     }
+
+    if (!city.checkValidity()) { city.reportValidity(); return false; }
     return true;
   }
 
@@ -1026,7 +1044,80 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // --- EVENT LISTENERS REGISTRATION ---
+  // ─── SEARCHABLE GOVERNORATE SELECT ───────────────────────────────────────
+  function initGovernorateSelect() {
+    const GOVERNORATES = [
+      'القاهرة', 'الجيزة', 'الإسكندرية', 'البحيرة', 'المنوفية',
+      'الغربية', 'كفر الشيخ', 'الدقهلية', 'دمياط', 'الشرقية',
+      'القليوبية', 'بور سعيد', 'الإسماعيلية', 'السويس',
+      'شمال سيناء', 'جنوب سيناء', 'مطروح', 'الوادي الجديد',
+      'الفيوم', 'بني سويف', 'المنيا', 'أسيوط', 'سوهاج',
+      'قنا', 'الأقصر', 'أسوان', 'البحر الأحمر'
+    ];
+
+    const wrapper    = document.getElementById('governorateSelect');
+    const searchInput = document.getElementById('coGovernorateSearch');
+    const hiddenInput = document.getElementById('coGovernorate');
+    const dropdown   = document.getElementById('governorateDropdown');
+
+    if (!wrapper || !searchInput || !hiddenInput || !dropdown) return;
+
+    function renderOptions(filter) {
+      const q = (filter || '').trim();
+      const matched = GOVERNORATES.filter(g => g.includes(q));
+      dropdown.innerHTML = '';
+      if (matched.length === 0) {
+        const li = document.createElement('div');
+        li.className = 'searchable-select-option no-results';
+        li.textContent = 'لا توجد نتائج';
+        dropdown.appendChild(li);
+      } else {
+        matched.forEach(gov => {
+          const li = document.createElement('div');
+          li.className = 'searchable-select-option';
+          li.textContent = gov;
+          li.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            searchInput.value  = gov;
+            hiddenInput.value  = gov;
+            closeDropdown();
+          });
+          dropdown.appendChild(li);
+        });
+      }
+    }
+
+    function openDropdown() {
+      wrapper.classList.add('open');
+      renderOptions(searchInput.value);
+    }
+
+    function closeDropdown() {
+      wrapper.classList.remove('open');
+    }
+
+    // Click on input → open
+    searchInput.addEventListener('focus', openDropdown);
+    searchInput.addEventListener('click', openDropdown);
+
+    // Typing → filter
+    searchInput.addEventListener('input', () => {
+      hiddenInput.value = ''; // clear selection until user picks
+      if (!wrapper.classList.contains('open')) openDropdown();
+      renderOptions(searchInput.value);
+    });
+
+    // Close on outside click
+    document.addEventListener('click', (e) => {
+      if (!wrapper.contains(e.target)) closeDropdown();
+    });
+
+    // Render initial (all options)
+    renderOptions('');
+  }
+
   function registerEventListeners() {
+
     // Sticky header adjustments
     window.addEventListener("scroll", () => {
       const header = document.getElementById("mainHeader");
@@ -1049,15 +1140,24 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const openDrawerElement = (el) => {
       if (!el) return;
+      const currentActives = document.querySelectorAll(
+        ".cart-drawer.active, .wishlist-drawer.active, .mobile-drawer.active, .filter-sidebar.active, .modal.active, .checkout-modal.active, .success-modal.active, .payment-gate-modal.active"
+      );
+      currentActives.forEach(item => {
+        if (item !== el) item.classList.remove("active");
+      });
+
       el.classList.add("active");
       if (elements.drawerOverlay) elements.drawerOverlay.classList.add("active");
       document.body.style.overflow = "hidden";
-      pushModalHistory();
+      if (!isHistoryPushed) {
+        pushModalHistory();
+      }
     };
 
     const closeDrawers = (fromPopstate = false) => {
       const activeElements = document.querySelectorAll(
-        ".cart-drawer.active, .wishlist-drawer.active, .mobile-drawer.active, .filter-sidebar.active, .quick-view-modal.active, .checkout-modal.active, .success-modal.active, .payment-gate-modal.active, .drawer-overlay.active"
+        ".cart-drawer.active, .wishlist-drawer.active, .mobile-drawer.active, .filter-sidebar.active, .modal.active, .checkout-modal.active, .success-modal.active, .payment-gate-modal.active, .drawer-overlay.active"
       );
 
       activeElements.forEach(el => el.classList.remove("active"));
@@ -1097,7 +1197,14 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     });
     elements.closeCartBtn.addEventListener("click", () => closeDrawers());
-    elements.startShoppingBtn.addEventListener("click", () => closeDrawers());
+    elements.startShoppingBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      closeDrawers();
+      setTimeout(() => {
+        const shopEl = document.getElementById('shop-section');
+        if (shopEl) shopEl.scrollIntoView({ behavior: 'smooth' });
+      }, 300);
+    });
 
     // Wishlist drawer toggles
     if (elements.wishlistToggleBtn) {
@@ -1109,7 +1216,14 @@ document.addEventListener("DOMContentLoaded", () => {
       elements.closeWishlistBtn.addEventListener("click", () => closeDrawers());
     }
     if (elements.wishlistStartShoppingBtn) {
-      elements.wishlistStartShoppingBtn.addEventListener("click", () => closeDrawers());
+      elements.wishlistStartShoppingBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        closeDrawers();
+        setTimeout(() => {
+          const shopEl = document.getElementById('shop-section');
+          if (shopEl) shopEl.scrollIntoView({ behavior: 'smooth' });
+        }, 300);
+      });
     }
 
     // Mobile Filter Sidebar Toggle
@@ -1312,9 +1426,14 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     // Modal Close operations
-    const closeQuickView = () => closeDrawers();
-    elements.closeQuickViewBtn.addEventListener("click", closeQuickView);
-    elements.quickViewBackdrop.addEventListener("click", closeQuickView);
+    elements.closeQuickViewBtn.addEventListener("click", () => {
+      elements.quickViewModal.classList.remove("active");
+      document.body.style.overflow = "";
+    });
+    elements.quickViewBackdrop.addEventListener("click", () => {
+      elements.quickViewModal.classList.remove("active");
+      document.body.style.overflow = "";
+    });
 
     // Add to cart from Quick View Modal
     elements.qvAddToCartBtn.addEventListener("click", () => {
@@ -1329,22 +1448,19 @@ document.addEventListener("DOMContentLoaded", () => {
     // Checkout Modal open click
     elements.checkoutBtn.addEventListener("click", () => {
       if (cart.length === 0) return;
-      closeDrawers();
       showCheckoutStep(1);
       openDrawerElement(elements.checkoutModal);
     });
 
     const closeCheckout = () => {
-      elements.checkoutModal.classList.remove("active");
-      document.body.style.overflow = "auto";
+      closeDrawers();
     };
     elements.closeCheckoutBtn.addEventListener("click", closeCheckout);
     elements.checkoutBackdrop.addEventListener("click", closeCheckout);
 
     // Payment Gate Modal close operations
     const closePaymentGate = () => {
-      elements.paymentGateModal.classList.remove("active");
-      document.body.style.overflow = "auto";
+      closeDrawers();
     };
     elements.closePaymentGateBtn.addEventListener("click", closePaymentGate);
     elements.paymentGateBackdrop.addEventListener("click", closePaymentGate);
@@ -1727,8 +1843,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     elements.closeSuccessBtn.addEventListener("click", () => {
-      elements.successModal.classList.remove("active");
-      document.body.style.overflow = "auto";
+      closeDrawers();
     });
 
     // Newsletter simulated submission

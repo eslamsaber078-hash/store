@@ -2266,6 +2266,103 @@ img {
   color: var(--color-text-muted);
 }
 
+/* ── Searchable Select (Governorate) ───────────────────────── */
+.searchable-select {
+  position: relative;
+  width: 100%;
+}
+
+.searchable-select-input {
+  background-color: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 12px 44px 12px 18px;
+  font-size: 0.9rem;
+  width: 100%;
+  transition: all var(--transition-fast);
+  cursor: pointer;
+  color: var(--color-text-primary);
+}
+
+.searchable-select-input:focus {
+  border-color: var(--color-gold);
+  box-shadow: 0 0 8px rgba(212, 175, 55, 0.15);
+  outline: none;
+}
+
+.searchable-select-input::placeholder {
+  color: var(--color-text-muted);
+}
+
+.searchable-select-arrow {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  pointer-events: none;
+  transition: transform var(--transition-fast);
+}
+
+.searchable-select.open .searchable-select-arrow {
+  transform: translateY(-50%) rotate(180deg);
+}
+
+.searchable-select-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  max-height: 220px;
+  overflow-y: auto;
+  z-index: 9999;
+  display: none;
+  box-shadow: var(--shadow-lg);
+}
+
+.searchable-select.open .searchable-select-dropdown {
+  display: block;
+}
+
+.searchable-select-option {
+  padding: 11px 18px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.searchable-select-option:last-child {
+  border-bottom: none;
+}
+
+.searchable-select-option:hover,
+.searchable-select-option.highlighted {
+  background-color: var(--color-gold-light);
+  color: var(--color-gold);
+}
+
+.searchable-select-option.no-results {
+  color: var(--color-text-muted);
+  cursor: default;
+  font-size: 0.85rem;
+  text-align: center;
+  padding: 16px;
+}
+
+.searchable-select-option.no-results:hover {
+  background: transparent;
+  color: var(--color-text-muted);
+}
+
+/* scrollbar inside dropdown */
+.searchable-select-dropdown::-webkit-scrollbar { width: 4px; }
+.searchable-select-dropdown::-webkit-scrollbar-thumb { background: var(--color-bg-tertiary); border-radius: 4px; }
+
 .checkout-step-actions {
   display: flex;
   justify-content: space-between;

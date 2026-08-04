@@ -718,17 +718,14 @@
               </div>
               <div class="form-group col-6">
                 <label for="coGovernorate">المحافظة *</label>
-                <select id="coGovernorate" required>
-                  <option value="" disabled selected>اختر محافظتك</option>
-                  <option value="القاهرة">القاهرة</option>
-                  <option value="الجيزة">الجيزة</option>
-                  <option value="الأسكندرية">الأسكندرية</option>
-                  <option value="القليوبية">القليوبية</option>
-                  <option value="الشرقية">الشرقية</option>
-                  <option value="الغربية">الغربية</option>
-                  <option value="الدقهلية">الدقهلية</option>
-                  <option value="أخرى">محافظة أخرى</option>
-                </select>
+                <div class="searchable-select" id="governorateSelect">
+                  <input type="text" class="searchable-select-input" id="coGovernorateSearch" placeholder="ابحث عن محافظتك..." autocomplete="off" required>
+                  <input type="hidden" id="coGovernorate" required>
+                  <i class="fa-solid fa-chevron-down searchable-select-arrow"></i>
+                  <div class="searchable-select-dropdown" id="governorateDropdown">
+                    <!-- Populated by JS -->
+                  </div>
+                </div>
               </div>
               <div class="form-group col-6">
                 <label for="coCity">المدينة أو المنطقة *</label>
