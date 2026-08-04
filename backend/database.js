@@ -1,6 +1,5 @@
 const { Pool } = require('pg');
 const pg = require('pg');
-const sqlite3 = require('sqlite3').verbose();
 const bcrypt = require('bcrypt');
 const path = require('path');
 const fs = require('fs');
@@ -144,16 +143,21 @@ const db = {
 // ─── Initialization Logic ─────────────────────────────────────────────────
 function initSqlite() {
     console.log("[DB] Using local SQLite database (database.sqlite)");
-    activeDriver = 'sqlite';
-    const dbPath = path.join(__dirname, 'database.sqlite');
-    sqliteDb = new sqlite3.Database(dbPath, (err) => {
-        if (err) {
-            console.error("[DB] Failed to open local SQLite database:", err.message);
-        } else {
-            console.log("[DB] SQLite database connected successfully.");
-            initDb();
-        }
-    });
+    try {
+        const sqlite3 = require('sqlite3').verbose();
+        activeDriver = 'sqlite';
+        const dbPath = path.join(__dirname, 'database.sqlite');
+        sqliteDb = new sqlite3.Database(dbPath, (err) => {
+            if (err) {
+                console.error("[DB] Failed to open local SQLite database:", err.message);
+            } else {
+                console.log("[DB] SQLite database connected successfully.");
+                initDb();
+            }
+        });
+    } catch(e) {
+        console.error("[DB] sqlite3 native module load error:", e.message);
+    }
 }
 
 const connectionString = process.env.DATABASE_URL;
