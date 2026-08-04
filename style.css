@@ -225,13 +225,16 @@ img {
 }
 
 /* ══════════════════════════════════════════════════════
-   ANNOUNCEMENT BAR — Animated Ticker
+   ANNOUNCEMENT BAR — 2026 Next-Gen Glassmorphic Marquee
    ══════════════════════════════════════════════════════ */
 .announcement-bar {
   position: relative;
-  background: linear-gradient(90deg, #0a0a0a 0%, #1a1200 30%, #2a1a00 50%, #1a1200 70%, #0a0a0a 100%);
-  border-bottom: 1px solid rgba(212, 175, 55, 0.25);
-  height: 38px;
+  background: rgba(12, 12, 16, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(212, 175, 55, 0.2);
+  box-shadow: 0 4px 25px rgba(0, 0, 0, 0.6);
+  height: 40px;
   display: flex;
   align-items: center;
   overflow: hidden;
@@ -246,22 +249,20 @@ img {
   border: none;
 }
 
-/* Subtle shimmer overlay */
-.announcement-bar::before {
+/* Futuristic ambient gold glow line at bottom */
+.announcement-bar::after {
   content: '';
   position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(212, 175, 55, 0.05) 50%,
-    transparent 100%
-  );
-  animation: shimmerBar 3s ease-in-out infinite;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, rgba(212, 175, 55, 0.6) 50%, transparent 100%);
+  animation: glowPulse 3s ease-in-out infinite;
   pointer-events: none;
 }
-@keyframes shimmerBar {
-  0%, 100% { opacity: 0; }
+@keyframes glowPulse {
+  0%, 100% { opacity: 0.3; }
   50%       { opacity: 1; }
 }
 
@@ -270,99 +271,91 @@ img {
   flex: 1;
   overflow: hidden;
   min-width: 0;
-  mask-image: linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%);
-  -webkit-mask-image: linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0%, black 6%, black 94%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, black 6%, black 94%, transparent 100%);
 }
 
-/* Track — two copies of the text side by side for seamless loop */
+/* Track — hardware accelerated loop */
 .announcement-track {
   display: flex;
   width: max-content;
-  animation: tickerScroll 30s linear infinite;
+  will-change: transform;
+  animation: tickerScroll 28s linear infinite;
 }
 .announcement-track:hover {
   animation-play-state: paused;
 }
 @keyframes tickerScroll {
-  0%   { transform: translateX(0); }
-  100% { transform: translateX(-50%); }
+  0%   { transform: translate3d(0, 0, 0); }
+  100% { transform: translate3d(-50%, 0, 0); }
+}
+
+/* Live signal dot */
+.live-dot-pulse {
+  width: 6px;
+  height: 6px;
+  background-color: #10B981;
+  border-radius: 50%;
+  box-shadow: 0 0 8px #10B981;
+  display: inline-block;
+  margin-left: 2px;
+  animation: liveDotPulse 1.8s ease-in-out infinite;
+  flex-shrink: 0;
+}
+@keyframes liveDotPulse {
+  0%, 100% { transform: scale(1); opacity: 1; box-shadow: 0 0 6px #10B981; }
+  50%       { transform: scale(1.4); opacity: 0.7; box-shadow: 0 0 12px #10B981; }
 }
 
 /* Each item */
 .announcement-item {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 0 60px;
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.85);
-  letter-spacing: 0.3px;
+  gap: 10px;
+  padding: 0 45px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.92);
+  letter-spacing: 0.4px;
   white-space: nowrap;
   font-family: var(--font-primary);
 }
 
 .announcement-icon {
   color: var(--color-gold);
-  font-size: 0.8rem;
+  font-size: 0.85rem;
   flex-shrink: 0;
+  filter: drop-shadow(0 0 4px rgba(212, 175, 55, 0.5));
 }
 .announcement-divider {
-  color: rgba(212, 175, 55, 0.4);
-  font-size: 1rem;
-  margin: 0 8px;
+  color: rgba(212, 175, 55, 0.35);
+  font-size: 0.9rem;
+  margin-right: 15px;
 }
 
-/* Promo code badge — pulsing gold pill */
+/* Promo code badge — 2026 luxury gold pill */
 .promo-code-badge {
   display: inline-flex;
   align-items: center;
-  background: linear-gradient(135deg, var(--color-gold), #c8950a);
-  color: #000;
-  font-size: 0.72rem;
-  font-weight: 800;
-  letter-spacing: 1.5px;
-  padding: 2px 8px;
-  border-radius: 4px;
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.25) 0%, rgba(255, 215, 0, 0.08) 100%);
+  border: 1px solid rgba(212, 175, 55, 0.5);
+  color: #FDF0D5;
+  font-size: 0.73rem;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  padding: 2px 9px;
+  border-radius: 20px;
   font-family: var(--font-display);
-  box-shadow: 0 0 8px rgba(212, 175, 55, 0.5);
-  animation: badgePulse 2.5s ease-in-out infinite;
-}
-@keyframes badgePulse {
-  0%, 100% { box-shadow: 0 0 6px rgba(212, 175, 55, 0.4); }
-  50%       { box-shadow: 0 0 14px rgba(212, 175, 55, 0.8); }
+  box-shadow: 0 0 10px rgba(212, 175, 55, 0.25);
+  margin: 0 4px;
+  text-shadow: 0 0 8px rgba(212, 175, 55, 0.4);
 }
 
-/* Close button */
-.announcement-close {
-  flex-shrink: 0;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  border: 1px solid rgba(212, 175, 55, 0.3);
-  background: rgba(212, 175, 55, 0.08);
-  color: rgba(255, 255, 255, 0.6);
-  font-size: 0.75rem;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-right: 12px;
-  transition: background 0.2s, color 0.2s, border-color 0.2s;
-  line-height: 1;
-}
-.announcement-close:hover {
-  background: rgba(212, 175, 55, 0.2);
-  border-color: var(--color-gold);
-  color: #fff;
-}
-
-/* Mobile: slightly smaller */
+/* Mobile: responsive */
 @media (max-width: 480px) {
-  .announcement-bar  { height: 32px; }
-  .announcement-item { font-size: 0.72rem; padding: 0 40px; }
-  .promo-code-badge  { font-size: 0.68rem; }
-  .announcement-close{ width: 24px; height: 24px; margin-right: 8px; }
+  .announcement-bar  { height: 34px; }
+  .announcement-item { font-size: 0.74rem; padding: 0 30px; gap: 8px; }
+  .promo-code-badge  { font-size: 0.68rem; padding: 1px 7px; }
 }
 
 

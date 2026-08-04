@@ -1,4 +1,6 @@
-const API_URL = window.location.origin + '/api';
+const API_URL = (window.location.protocol === 'http:' || window.location.protocol === 'https:')
+    ? window.location.origin + '/api'
+    : 'http://localhost:3000/api';
 let authToken = localStorage.getItem('adminToken') || null;
 
 // ─── Session Timeout (10 minutes inactivity auto-logout) ──────────────────

@@ -117,27 +117,25 @@ const loginLimiter = rateLimit({
 
 // ─── Middleware ────────────────────────────────────────────────────────────
 app.use(helmet({
-    contentSecurityPolicy: {
-        directives: {
-            defaultSrc:  ["'self'"],
-            scriptSrc:   ["'self'", "'unsafe-inline'", "https://accounts.google.com", "https://cdnjs.cloudflare.com", "https://fonts.googleapis.com"],
-            styleSrc:    ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://cdnjs.cloudflare.com"],
-            fontSrc:     ["'self'", "https://fonts.gstatic.com", "https://cdnjs.cloudflare.com"],
-            imgSrc:      ["'self'", "data:", "https://res.cloudinary.com", "https://lh3.googleusercontent.com", "blob:"],
-            connectSrc:  ["'self'", "https://accounts.google.com", "https://oauth2.googleapis.com"],
-            frameSrc:    ["'none'"],
-            objectSrc:   ["'none'"],
-            upgradeInsecureRequests: []
-        }
-    },
-    crossOriginEmbedderPolicy: false // Allow Google fonts/CDN
+    contentSecurityPolicy: false,
+    crossOriginEmbedderPolicy: false
 }));
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: '2mb' }));         // Limit JSON body size
 app.use(express.urlencoded({ extended: false, limit: '2mb' }));
+const noCacheStatic = {
+    etag: false,
+    lastModified: false,
+    setHeaders: (res) => {
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+    }
+};
+
 app.use('/assets/images', express.static(path.join(__dirname, '../assets/images')));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-app.use(express.static(path.join(__dirname, '../')));
+app.use(express.static(path.join(__dirname, '../'), noCacheStatic));
 
 // Authentication Middleware
 const authenticateToken = (req, res, next) => {

@@ -1,52 +1,20 @@
 const { Pool } = require('pg');
 const pg = require('pg');
+const sqlite3 = require('sqlite3').verbose();
 const bcrypt = require('bcrypt');
+const path = require('path');
+const fs = require('fs');
 
-// Global configuration: Parse bigints (like COUNT(*)) as standard JS numbers
+// Global configuration for PG: Parse bigints as numbers
 pg.types.setTypeParser(20, function(val) {
     return parseInt(val, 10);
 });
 
-// Configure PostgreSQL connection pool
-const connectionString = process.env.DATABASE_URL;
+let activeDriver = null; // 'pg' or 'sqlite'
+let pgPool = null;
+let sqliteDb = null;
 
-if (!connectionString) {
-    console.warn("WARNING: DATABASE_URL environment variable is missing. PostgreSQL pool will try default settings.");
-}
-
-const pool = new Pool({
-    connectionString: connectionString,
-    ssl: connectionString && !connectionString.includes('localhost') && !connectionString.includes('127.0.0.1')
-        ? { rejectUnauthorized: false }
-        : false
-});
-
-// Connect and initialize DB schema
-pool.connect((err, client, release) => {
-    if (err) {
-        console.error('Error connecting to the PostgreSQL database:', err.message);
-    } else {
-        console.log('Connected to the PostgreSQL database.');
-        release();
-        initDb();
-    }
-});
-
-// ─── Helper: convert ? placeholders to $1, $2... ───────────────────────────
-function convertPlaceholders(query) {
-    let index = 1;
-    return query.replace(/\?/g, () => `$${index++}`);
-}
-
-// ─── Helper: rewrite SQLite DDL → PostgreSQL DDL ───────────────────────────
-function rewriteDDL(query) {
-    return query
-        .replace(/INTEGER PRIMARY KEY AUTOINCREMENT/gi, 'SERIAL PRIMARY KEY')
-        .replace(/DATETIME/gi, 'TIMESTAMP')
-        .replace(/\bBOOLEAN\b/gi, 'INTEGER');
-}
-
-// ─── Statement class (db.prepare compatibility) ────────────────────────────
+// ─── Statement Class for db.prepare Compatibility ─────────────────────────
 class Statement {
     constructor(dbInstance, query) {
         this.db = dbInstance;
@@ -78,63 +46,94 @@ class Statement {
     }
 }
 
-// ─── Compatibility layer ───────────────────────────────────────────────────
+// ─── Core db Interface ────────────────────────────────────────────────────
 const db = {
-    pool,
-
     run(query, params, callback) {
         if (typeof params === 'function') { callback = params; params = []; }
+        params = params || [];
 
-        let q = rewriteDDL(query);
-        q = convertPlaceholders(q);
+        if (activeDriver === 'sqlite') {
+            let q = query.replace(/SERIAL PRIMARY KEY/gi, 'INTEGER PRIMARY KEY AUTOINCREMENT')
+                         .replace(/TIMESTAMP/gi, 'DATETIME');
+            sqliteDb.run(q, params, function(err) {
+                const ctx = { lastID: this ? this.lastID : null, changes: this ? this.changes : 0 };
+                if (callback) callback.call(ctx, err);
+            });
+        } else if (activeDriver === 'pg') {
+            let q = query.replace(/INTEGER PRIMARY KEY AUTOINCREMENT/gi, 'SERIAL PRIMARY KEY')
+                         .replace(/DATETIME/gi, 'TIMESTAMP');
+            let index = 1;
+            q = q.replace(/\?/g, () => `$${index++}`);
 
-        // Auto-append RETURNING id for INSERTs (except settings which has no integer id)
-        const isInsert   = /^\s*insert\s+into/i.test(q);
-        const isSettings = /into\s+settings/i.test(q);
-        if (isInsert && !isSettings && !/returning/i.test(q)) {
-            q += ' RETURNING id';
-        }
+            const isInsert = /^\s*insert\s+into/i.test(q);
+            const isSettings = /into\s+settings/i.test(q);
+            if (isInsert && !isSettings && !/returning/i.test(q)) {
+                q += ' RETURNING id';
+            }
 
-        pool.query(q, params || [], (err, result) => {
-            const ctx = { lastID: null, changes: 0 };
-            if (err) {
-                // Silently ignore duplicate-column / duplicate-table during migrations
-                if (err.code === '42701' || err.code === '42P07') {
-                    if (callback) callback.call(ctx, null);
+            pgPool.query(q, params, (err, result) => {
+                const ctx = { lastID: null, changes: 0 };
+                if (err) {
+                    if (err.code === '42701' || err.code === '42P07') {
+                        if (callback) callback.call(ctx, null);
+                        return;
+                    }
+                    if (err.code === '23505') {
+                        err.message = 'UNIQUE constraint failed: ' + (err.detail || '');
+                    }
+                    if (callback) callback.call(ctx, err);
                     return;
                 }
-                // Map unique-constraint error to SQLite-compatible message
-                if (err.code === '23505') {
-                    err.message = 'UNIQUE constraint failed: ' + (err.detail || '');
+                ctx.changes = result.rowCount;
+                if (result.rows && result.rows.length > 0 && result.rows[0].id !== undefined) {
+                    ctx.lastID = result.rows[0].id;
                 }
-                if (callback) callback.call(ctx, err);
-                return;
-            }
-            ctx.changes = result.rowCount;
-            if (result.rows && result.rows.length > 0 && result.rows[0].id !== undefined) {
-                ctx.lastID = result.rows[0].id;
-            }
-            if (callback) callback.call(ctx, null);
-        });
+                if (callback) callback.call(ctx, null);
+            });
+        } else {
+            if (callback) callback.call({ lastID: null, changes: 0 }, new Error("Database driver not initialized"));
+        }
     },
 
     get(query, params, callback) {
         if (typeof params === 'function') { callback = params; params = []; }
-        const q = convertPlaceholders(query);
-        pool.query(q, params || [], (err, result) => {
-            if (err) { if (callback) callback(err, null); return; }
-            const row = result.rows && result.rows.length > 0 ? result.rows[0] : null;
-            if (callback) callback(null, row);
-        });
+        params = params || [];
+
+        if (activeDriver === 'sqlite') {
+            sqliteDb.get(query, params, (err, row) => {
+                if (callback) callback(err, row || null);
+            });
+        } else if (activeDriver === 'pg') {
+            let index = 1;
+            const q = query.replace(/\?/g, () => `$${index++}`);
+            pgPool.query(q, params, (err, result) => {
+                if (err) { if (callback) callback(err, null); return; }
+                const row = result.rows && result.rows.length > 0 ? result.rows[0] : null;
+                if (callback) callback(null, row);
+            });
+        } else {
+            if (callback) callback(new Error("Database driver not initialized"), null);
+        }
     },
 
     all(query, params, callback) {
         if (typeof params === 'function') { callback = params; params = []; }
-        const q = convertPlaceholders(query);
-        pool.query(q, params || [], (err, result) => {
-            if (err) { if (callback) callback(err, null); return; }
-            if (callback) callback(null, result.rows || []);
-        });
+        params = params || [];
+
+        if (activeDriver === 'sqlite') {
+            sqliteDb.all(query, params, (err, rows) => {
+                if (callback) callback(err, rows || []);
+            });
+        } else if (activeDriver === 'pg') {
+            let index = 1;
+            const q = query.replace(/\?/g, () => `$${index++}`);
+            pgPool.query(q, params, (err, result) => {
+                if (err) { if (callback) callback(err, null); return; }
+                if (callback) callback(null, result.rows || []);
+            });
+        } else {
+            if (callback) callback(new Error("Database driver not initialized"), []);
+        }
     },
 
     prepare(query) {
@@ -142,11 +141,53 @@ const db = {
     }
 };
 
+// ─── Initialization Logic ─────────────────────────────────────────────────
+function initSqlite() {
+    console.log("[DB] Using local SQLite database (database.sqlite)");
+    activeDriver = 'sqlite';
+    const dbPath = path.join(__dirname, 'database.sqlite');
+    sqliteDb = new sqlite3.Database(dbPath, (err) => {
+        if (err) {
+            console.error("[DB] Failed to open local SQLite database:", err.message);
+        } else {
+            console.log("[DB] SQLite database connected successfully.");
+            initDb();
+        }
+    });
+}
+
+const connectionString = process.env.DATABASE_URL;
+
+if (connectionString) {
+    console.log("[DB] DATABASE_URL provided. Connecting to PostgreSQL...");
+    pgPool = new Pool({
+        connectionString,
+        ssl: !connectionString.includes('localhost') && !connectionString.includes('127.0.0.1')
+            ? { rejectUnauthorized: false }
+            : false
+    });
+
+    pgPool.connect((err, client, release) => {
+        if (err) {
+            console.warn("[DB] PostgreSQL connection failed:", err.message);
+            initSqlite();
+        } else {
+            console.log("[DB] Connected to PostgreSQL successfully.");
+            activeDriver = 'pg';
+            release();
+            initDb();
+        }
+    });
+} else {
+    // No DATABASE_URL set -> use local SQLite directly for local dev!
+    initSqlite();
+}
+
 // ─── Schema + Seed ─────────────────────────────────────────────────────────
 function initDb() {
     // 1. users
     db.run(`CREATE TABLE IF NOT EXISTS users (
-        id SERIAL PRIMARY KEY,
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
         username TEXT UNIQUE,
         password TEXT,
         name TEXT,
@@ -162,14 +203,14 @@ function initDb() {
             db.run(
                 "INSERT INTO users (username, password, name, role) VALUES (?, ?, 'Eslam Admin', 'admin')",
                 [adminUsername, hash],
-                (err) => { if (!err) console.log("Admin account seeded: eslam.bk"); }
+                (err) => { if (!err) console.log("[DB] Admin account seeded: eslam.bk / 01190622530"); }
             );
         });
     });
 
-    // 2. products — all snake_case to avoid PostgreSQL case-folding issues
+    // 2. products
     db.run(`CREATE TABLE IF NOT EXISTS products (
-        id SERIAL PRIMARY KEY,
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT,
         category TEXT,
         category_name TEXT,
@@ -186,8 +227,6 @@ function initDb() {
         featured INTEGER DEFAULT 0
     )`, (err) => {
         if (err) return;
-        
-        // Ensure older DB instances created in previous sessions get the new snake_case columns if they don't exist
         db.run("ALTER TABLE products ADD COLUMN category_name TEXT", () => {});
         db.run("ALTER TABLE products ADD COLUMN old_price REAL", () => {});
         db.run("ALTER TABLE products ADD COLUMN reviews_count INTEGER", () => {});
@@ -195,9 +234,9 @@ function initDb() {
         db.run("ALTER TABLE products ADD COLUMN featured INTEGER DEFAULT 0", () => {});
     });
 
-    // 3. orders — already snake_case
+    // 3. orders
     db.run(`CREATE TABLE IF NOT EXISTS orders (
-        id SERIAL PRIMARY KEY,
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
         order_number TEXT,
         customer_name TEXT,
         phone TEXT,
@@ -211,13 +250,13 @@ function initDb() {
         status TEXT DEFAULT 'pending',
         payment_sender TEXT,
         payment_reference TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )`);
 
-    // 4. order_items — use REFERENCES without inline FOREIGN KEY keyword for clarity
+    // 4. order_items
     db.run(`CREATE TABLE IF NOT EXISTS order_items (
-        id SERIAL PRIMARY KEY,
-        order_id INTEGER REFERENCES orders(id),
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        order_id INTEGER,
         product_name TEXT,
         quantity INTEGER,
         price REAL,
@@ -238,13 +277,13 @@ function initDb() {
                 { key: 'instapay',                  value: 'eslam.bk@instapay' },
                 { key: 'ewallets',                  value: '01190622530 (فودافون كاش)' },
                 { key: 'cash_on_delivery_enabled',  value: 'true' },
-                { key: 'announcement_text',         value: '🚚 شحن مجاني للطلبات أكثر من 3,000 ج.م | استخدم كود DAVINCI10 للحصول على خصم 10%' },
+                { key: 'announcement_text',         value: '["🚚 شحن مجاني للطلبات أكثر من 3,000 ج.م", "🏷️ استخدم كود DAVINCI10 للحصول على خصم 10%"]' },
                 { key: 'announcement_enabled',      value: 'true' }
             ];
             const stmt = db.prepare("INSERT INTO settings (key, value) VALUES (?, ?)");
             defaultSettings.forEach(s => stmt.run(s.key, s.value));
             stmt.finalize();
-            console.log("Default payment settings seeded.");
+            console.log("[DB] Default payment and announcement settings seeded.");
         });
     });
 }

@@ -169,7 +169,9 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   // --- WIDGET & UI INITIALIZATIONS ---
-  const API_BASE = window.location.origin + '/api';
+  const API_BASE = (window.location.protocol === 'http:' || window.location.protocol === 'https:')
+    ? window.location.origin + '/api'
+    : 'http://localhost:3000/api';
   initApp();
 
   async function initApp() {
@@ -215,17 +217,16 @@ document.addEventListener("DOMContentLoaded", () => {
     initGoogleSignIn();
   }
 
-  // ── Announcement Bar logic ────────────────────────────────────────────────
+  // ── Announcement Bar logic (2026 Next-Gen Marquee) ───────────────────────────
   function initAnnouncementBar(settings) {
-    const bar       = document.getElementById('announcementBar');
-    const closeBtn  = document.getElementById('announcementClose');
+    const bar = document.getElementById('announcementBar');
     if (!bar) return;
 
     const enabled = settings.announcement_enabled !== 'false';
     const textVal = (settings.announcement_text || '').trim();
 
-    // If disabled by admin OR no text OR user already closed it this session
-    if (!enabled || !textVal || sessionStorage.getItem('announcementClosed') === '1') {
+    // Hide if disabled by admin or no text
+    if (!enabled || !textVal) {
         bar.classList.add('hidden');
         return;
     }
@@ -243,7 +244,6 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
     }
 
-    // Now render these announcements side-by-side in the marquee!
     const track = document.getElementById('announcementTrack');
     if (track) {
         const html = texts.map((t) => {
@@ -259,33 +259,24 @@ document.addEventListener("DOMContentLoaded", () => {
                 icon = 'fa-fire';
             }
             
-            // Format promo code badge if there is a code like DAVINCI10
             let formattedText = t;
             const promoRegex = /(DAVINCI10|[A-Z]{3,}\d{2,})/g;
             formattedText = formattedText.replace(promoRegex, match => `<span class="promo-code-badge">${match}</span>`);
 
             return `
               <span class="announcement-item">
+                <span class="live-dot-pulse"></span>
                 <i class="fa-solid ${icon} announcement-icon"></i>
                 <span>${formattedText}</span>
-                <span class="announcement-divider">|</span>
+                <span class="announcement-divider">•</span>
               </span>
             `;
         }).join("");
 
-        // Double for seamless marquee loop
         track.innerHTML = html + html;
     }
 
     bar.classList.remove('hidden');
-
-    // Close button
-    if (closeBtn) {
-        closeBtn.addEventListener('click', () => {
-            bar.classList.add('hidden');
-            sessionStorage.setItem('announcementClosed', '1');
-        });
-    }
   }
 
 
@@ -486,7 +477,7 @@ document.addEventListener("DOMContentLoaded", () => {
         ? Math.round(((product.oldPrice - product.price) / product.oldPrice) * 100) 
         : 0;
 
-      const isWishlisted = wishlist.includes(product.id);
+      const isWishlisted = wishlist.some(id => String(id) === String(product.id));
 
       return `
         <article class="product-card" data-id="${product.id}">
