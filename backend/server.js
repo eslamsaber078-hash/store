@@ -141,10 +141,10 @@ app.use(express.static(path.join(__dirname, '../'), noCacheStatic));
 const authenticateToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
-    if (token == null) return res.status(401).json({ error: "Unauthorized" });
+    if (token == null) return res.status(401).json({ error: "انتهت صلاحية الجلسة، يرجى إعادة تسجيل الدخول" });
 
     jwt.verify(token, SECRET_KEY, (err, user) => {
-        if (err) return res.status(403).json({ error: "Forbidden" });
+        if (err) return res.status(403).json({ error: "انتهت صلاحية الجلسة، يرجى إعادة تسجيل الدخول" });
         req.user = user;
         next();
     });
@@ -154,7 +154,7 @@ const isAdmin = (req, res, next) => {
     if (req.user && req.user.role === 'admin') {
         next();
     } else {
-        res.status(403).json({ error: "Requires Admin Privileges" });
+        res.status(403).json({ error: "غير مصرح لك بإجراء هذه العملية (صلاحيات الأدمن مطلوبة)" });
     }
 };
 
@@ -172,7 +172,6 @@ app.post('/api/auth/login', loginLimiter, (req, res) => {
         }
 
         if (bcrypt.compareSync(password, user.password)) {
-            // Admin gets short-lived 10-min token; regular users get 24h
             const expiresIn = user.role === 'admin' ? '10m' : '24h';
             const token = jwt.sign(
                 { id: user.id, username: user.username, role: user.role },

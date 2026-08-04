@@ -179,18 +179,16 @@ document.addEventListener("DOMContentLoaded", () => {
         const prodRes = await fetch(`${API_BASE}/products`);
         if (!prodRes.ok) throw new Error(`HTTP ${prodRes.status}`);
         const apiProducts = await prodRes.json();
-        if (Array.isArray(apiProducts)) {
+        if (Array.isArray(apiProducts) && apiProducts.length > 0) {
             products = apiProducts;
+        } else if (typeof window !== 'undefined' && window.products && Array.isArray(window.products)) {
+            products = window.products;
         }
     } catch(err) {
         console.warn("API unavailable, using local products.js data:", err.message);
-        // Fallback to static products.js if it's loaded
         if (typeof window !== 'undefined' && window.products && Array.isArray(window.products)) {
             products = window.products;
-        } else if (typeof products !== 'undefined' && Array.isArray(products)) {
-            // products is the global from products.js
         }
-        // keep products = [] if all else fails
     }
 
     try {
@@ -554,7 +552,8 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function formatPrice(number) {
-    return `${number.toLocaleString("ar-EG")} ج.م`;
+    const val = parseFloat(number) || 0;
+    return `${val.toLocaleString("ar-EG")} ج.م`;
   }
 
   // --- CART OPERATIONS ---
@@ -563,45 +562,47 @@ document.addEventListener("DOMContentLoaded", () => {
     
     // Updates count badges
     const totalQty = cart.reduce((sum, item) => sum + item.quantity, 0);
-    elements.cartCount.innerText = totalQty;
-    elements.cartCountTitle.innerText = `${totalQty} قطعة`;
+    if (elements.cartCount) elements.cartCount.innerText = totalQty;
+    if (elements.cartCountTitle) elements.cartCountTitle.innerText = `${totalQty} قطعة`;
 
     // Toggle Empty state vs Filled state
     if (cart.length === 0) {
-      elements.cartEmptyState.style.display = "flex";
-      elements.cartFilledState.style.display = "none";
+      if (elements.cartEmptyState) elements.cartEmptyState.style.display = "flex";
+      if (elements.cartFilledState) elements.cartFilledState.style.display = "none";
       return;
     }
 
-    elements.cartEmptyState.style.display = "none";
-    elements.cartFilledState.style.display = "flex";
+    if (elements.cartEmptyState) elements.cartEmptyState.style.display = "none";
+    if (elements.cartFilledState) elements.cartFilledState.style.display = "flex";
 
     // Draw cart items list
-    elements.cartItemsList.innerHTML = cart.map((item, index) => {
-      const prod = products.find(p => String(p.id) === String(item.productId));
-      if (!prod) return "";
+    if (elements.cartItemsList) {
+      elements.cartItemsList.innerHTML = cart.map((item, index) => {
+        const prod = products.find(p => String(p.id) === String(item.productId));
+        if (!prod) return "";
 
-      return `
-        <div class="cart-item">
-          <img src="${prod.image}" alt="${prod.name}" class="cart-item-img">
-          <div class="cart-item-details">
-            <h4 class="cart-item-name">${prod.name}</h4>
-            <div class="cart-item-meta">
-              <span>المقاس: ${item.size || 'N/A'}</span> | <span>اللون: ${item.color && item.color.name ? item.color.name : 'افتراضي'}</span>
-            </div>
-            <div class="cart-item-controls">
-              <div class="cart-qty-selector">
-                <button class="cart-qty-btn" onclick="window.vogueUpdateCartQty(${index}, -1)" aria-label="تقليل الكمية"><i class="fa-solid fa-minus"></i></button>
-                <span class="cart-qty-val">${item.quantity}</span>
-                <button class="cart-qty-btn" onclick="window.vogueUpdateCartQty(${index}, 1)" aria-label="زيادة الكمية"><i class="fa-solid fa-plus"></i></button>
+        return `
+          <div class="cart-item">
+            <img src="${prod.image}" alt="${prod.name}" class="cart-item-img">
+            <div class="cart-item-details">
+              <h4 class="cart-item-name">${prod.name}</h4>
+              <div class="cart-item-meta">
+                <span>المقاس: ${item.size || 'N/A'}</span> | <span>اللون: ${item.color && item.color.name ? item.color.name : 'افتراضي'}</span>
               </div>
-              <span class="cart-item-price">${formatPrice(prod.price * item.quantity)}</span>
+              <div class="cart-item-controls">
+                <div class="cart-qty-selector">
+                  <button class="cart-qty-btn" onclick="window.vogueUpdateCartQty(${index}, -1)" aria-label="تقليل الكمية"><i class="fa-solid fa-minus"></i></button>
+                  <span class="cart-qty-val">${item.quantity}</span>
+                  <button class="cart-qty-btn" onclick="window.vogueUpdateCartQty(${index}, 1)" aria-label="زيادة الكمية"><i class="fa-solid fa-plus"></i></button>
+                </div>
+                <span class="cart-item-price">${formatPrice(prod.price * item.quantity)}</span>
+              </div>
             </div>
+            <button class="cart-item-remove" onclick="window.vogueRemoveFromCart(${index})" aria-label="حذف المنتج"><i class="fa-solid fa-trash-can"></i></button>
           </div>
-          <button class="cart-item-remove" onclick="window.vogueRemoveFromCart(${index})" aria-label="حذف المنتج"><i class="fa-solid fa-trash-can"></i></button>
-        </div>
-      `;
-    }).join("");
+        `;
+      }).join("");
+    }
 
     calculateCartTotals();
   }
@@ -609,10 +610,10 @@ document.addEventListener("DOMContentLoaded", () => {
   function calculateCartTotals() {
     const subtotal = cart.reduce((sum, item) => {
       const prod = products.find(p => String(p.id) === String(item.productId));
-      return sum + (prod ? prod.price * item.quantity : 0);
+      return sum + (prod ? (parseFloat(prod.price) || 0) * item.quantity : 0);
     }, 0);
 
-    elements.cartSubtotal.innerText = formatPrice(subtotal);
+    if (elements.cartSubtotal) elements.cartSubtotal.innerText = formatPrice(subtotal);
 
     let discount = 0;
     if (currentPromo) {
@@ -622,24 +623,24 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     if (discount > 0) {
-      elements.discountRow.style.display = "flex";
-      elements.cartDiscount.innerText = `-${formatPrice(discount)}`;
+      if (elements.discountRow) elements.discountRow.style.display = "flex";
+      if (elements.cartDiscount) elements.cartDiscount.innerText = `-${formatPrice(discount)}`;
     } else {
-      elements.discountRow.style.display = "none";
+      if (elements.discountRow) elements.discountRow.style.display = "none";
     }
 
     const total = Math.max(0, subtotal - discount);
-    elements.cartTotal.innerText = formatPrice(total);
+    if (elements.cartTotal) elements.cartTotal.innerText = formatPrice(total);
 
     // Sync values with checkout step 3 if checkout modal is populated
-    elements.coSubtotal.innerText = formatPrice(subtotal);
+    if (elements.coSubtotal) elements.coSubtotal.innerText = formatPrice(subtotal);
     if (discount > 0) {
-      elements.coDiscountRow.style.display = "flex";
-      elements.coDiscount.innerText = `-${formatPrice(discount)}`;
+      if (elements.coDiscountRow) elements.coDiscountRow.style.display = "flex";
+      if (elements.coDiscount) elements.coDiscount.innerText = `-${formatPrice(discount)}`;
     } else {
-      elements.coDiscountRow.style.display = "none";
+      if (elements.coDiscountRow) elements.coDiscountRow.style.display = "none";
     }
-    elements.coTotal.innerText = formatPrice(total);
+    if (elements.coTotal) elements.coTotal.innerText = formatPrice(total);
   }
 
   window.vogueUpdateCartQty = (index, delta) => {
@@ -695,25 +696,28 @@ document.addEventListener("DOMContentLoaded", () => {
   // ─── WISHLIST OPERATIONS ───
   function updateWishlistUI() {
     // Ensure all wishlist entries exist in the products list
-    wishlist = wishlist.filter(id => products.some(p => String(p.id) === String(id)));
+    if (products.length > 0) {
+      wishlist = wishlist.filter(id => products.some(p => String(p.id) === String(id)));
+    }
     localStorage.setItem("davinci_store_wishlist", JSON.stringify(wishlist));
     
     // Update count badges
-    elements.wishlistCount.innerText = wishlist.length;
-    elements.wishlistCountTitle.innerText = `${wishlist.length} قطعة`;
+    if (elements.wishlistCount) elements.wishlistCount.innerText = wishlist.length;
+    if (elements.wishlistCountTitle) elements.wishlistCountTitle.innerText = `${wishlist.length} قطعة`;
 
     // Toggle Empty state vs Filled state
     if (wishlist.length === 0) {
-      elements.wishlistEmptyState.style.display = "flex";
-      elements.wishlistFilledState.style.display = "none";
+      if (elements.wishlistEmptyState) elements.wishlistEmptyState.style.display = "flex";
+      if (elements.wishlistFilledState) elements.wishlistFilledState.style.display = "none";
       return;
     }
 
-    elements.wishlistEmptyState.style.display = "none";
-    elements.wishlistFilledState.style.display = "flex";
+    if (elements.wishlistEmptyState) elements.wishlistEmptyState.style.display = "none";
+    if (elements.wishlistFilledState) elements.wishlistFilledState.style.display = "flex";
 
     // Draw wishlist items list
-    elements.wishlistItemsList.innerHTML = wishlist.map((id) => {
+    if (elements.wishlistItemsList) {
+      elements.wishlistItemsList.innerHTML = wishlist.map((id) => {
       const prod = products.find(p => String(p.id) === String(id));
       if (!prod) return "";
 
@@ -735,6 +739,7 @@ document.addEventListener("DOMContentLoaded", () => {
         </div>
       `;
     }).join("");
+    }
   }
 
   window.vogueToggleWishlist = (productId) => {
@@ -1323,8 +1328,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Checkout Modal open click
     elements.checkoutBtn.addEventListener("click", () => {
+      if (cart.length === 0) return;
       closeDrawers();
       showCheckoutStep(1);
+      openDrawerElement(elements.checkoutModal);
+    });
+
+    const closeCheckout = () => {
       elements.checkoutModal.classList.remove("active");
       document.body.style.overflow = "auto";
     };

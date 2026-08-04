@@ -640,6 +640,11 @@ productForm.addEventListener('submit', async (e) => {
             closeProductModal();
             fetchProductsAdmin();
         } else {
+            if (res.status === 401 || res.status === 403) {
+                alert('انتهت صلاحية الجلسة، يرجى إعادة تسجيل الدخول.');
+                forceLogout();
+                return;
+            }
             const data = await res.json();
             alert(data.error || 'حدث خطأ أثناء حفظ المنتج.');
         }
