@@ -417,10 +417,10 @@ document.addEventListener("DOMContentLoaded", () => {
     // Filter by search query
     if (currentFilter.searchQuery.trim() !== "") {
       const query = currentFilter.searchQuery.toLowerCase().trim();
-      filteredList = filteredList.filter(p => 
-        p.name.toLowerCase().includes(query) || 
-        p.description.toLowerCase().includes(query) ||
-        p.categoryName.toLowerCase().includes(query)
+      filteredList = filteredList.filter(p =>
+        (p.name || '').toLowerCase().includes(query) ||
+        (p.description || '').toLowerCase().includes(query) ||
+        (p.categoryName || '').toLowerCase().includes(query)
       );
     }
 
@@ -450,7 +450,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // Update Counts & Titles
-    elements.productsCountText.innerText = `نعرض لكم ${filteredList.length} من أصل ${products.length} منتجاً فاخراً`;
+    if (elements.productsCountText) elements.productsCountText.innerText = `نعرض لكم ${filteredList.length} من أصل ${products.length} منتجاً فاخراً`;
     
     const catTitles = {
       all: "كل المنتجات الفاخرة",
@@ -459,19 +459,20 @@ document.addEventListener("DOMContentLoaded", () => {
       pants: "بناطيل وتصميمات عصرية",
       accessories: "ساعات وإكسسوارات النخبة"
     };
-    elements.currentCategoryTitle.innerText = catTitles[currentFilter.category] || "المنتجات الفاخرة";
+    if (elements.currentCategoryTitle) elements.currentCategoryTitle.innerText = catTitles[currentFilter.category] || "المنتجات الفاخرة";
 
     // Handle Empty State
     if (filteredList.length === 0) {
-      elements.productsGrid.style.display = "none";
-      elements.noProductsFound.style.display = "block";
+      if (elements.productsGrid) elements.productsGrid.style.display = "none";
+      if (elements.noProductsFound) elements.noProductsFound.style.display = "block";
       return;
     }
 
-    elements.productsGrid.style.display = "grid";
-    elements.noProductsFound.style.display = "none";
+    if (elements.productsGrid) elements.productsGrid.style.display = "grid";
+    if (elements.noProductsFound) elements.noProductsFound.style.display = "none";
 
     // Draw grid items HTML
+    if (!elements.productsGrid) return;
     elements.productsGrid.innerHTML = filteredList.map(product => {
       const discountPercentage = product.oldPrice 
         ? Math.round(((product.oldPrice - product.price) / product.oldPrice) * 100) 
