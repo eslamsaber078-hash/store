@@ -311,11 +311,11 @@ img {
 .announcement-item {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  padding: 0 45px;
-  font-size: 0.8rem;
+  gap: 12px;
+  padding: 0 65px;
+  font-size: 0.82rem;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.92);
+  color: rgba(255, 255, 255, 0.95);
   letter-spacing: 0.4px;
   white-space: nowrap;
   font-family: var(--font-primary);

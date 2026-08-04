@@ -243,7 +243,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const track = document.getElementById('announcementTrack');
     if (track) {
-        const html = texts.map((t) => {
+        const singleSetHtml = texts.map((t) => {
             let icon = 'fa-bullhorn';
             const lowerT = t.toLowerCase();
             if (lowerT.includes('شحن') || lowerT.includes('توصيل') || lowerT.includes('🚚')) {
@@ -270,7 +270,22 @@ document.addEventListener("DOMContentLoaded", () => {
             `;
         }).join("");
 
-        track.innerHTML = html + html;
+        // Ensure Block A has at least 6 items so it easily spans full desktop viewports (1800px+)
+        const targetItems = 6;
+        const repeatCount = Math.max(1, Math.ceil(targetItems / texts.length));
+        
+        let blockHtml = '';
+        for (let i = 0; i < repeatCount; i++) {
+            blockHtml += singleSetHtml;
+        }
+
+        // Duplicate Block A twice (Block A + Block A) for invisible 50% infinite loop
+        track.innerHTML = blockHtml + blockHtml;
+
+        // Adjust animation duration dynamically based on total item count for smooth speed
+        const totalBlockItems = texts.length * repeatCount;
+        const duration = Math.max(25, totalBlockItems * 6);
+        track.style.animationDuration = `${duration}s`;
     }
 
     bar.classList.remove('hidden');
