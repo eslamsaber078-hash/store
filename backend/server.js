@@ -307,7 +307,7 @@ app.get('/api/products', (req, res) => {
                 description:  r.description  || '',
                 sizes:        JSON.parse(r.sizes  || '[]'),
                 colors:       JSON.parse(r.colors || '[]'),
-                inStock:      r.in_stock === 1 || r.in_stock === true || r.in_stock === 'true',
+                inStock:      r.in_stock === 1 || r.in_stock === true || r.in_stock === 'true' || r.in_stock === null || r.in_stock === undefined,
                 featured:     r.featured === 1 || r.featured === true || r.featured === 'true'
             };
         });
@@ -347,8 +347,8 @@ app.post('/api/products', authenticateToken, isAdmin, upload.array('imagesFiles'
         description, 
         sizes || '[]',
         colors || '[]',
-        inStock === 'true' ? 1 : 0, 
-        featured === 'true' ? 1 : 0
+        inStock === 'true' || inStock === true || inStock === undefined || inStock === null ? 1 : 0, 
+        featured === 'true' || featured === true ? 1 : 0
     ], function(err) {
         if (err) return res.status(500).json({ error: err.message });
         res.json({ id: this.lastID, message: "Product added successfully" });
@@ -394,8 +394,8 @@ app.put('/api/products/:id', authenticateToken, isAdmin, upload.array('imagesFil
         description, 
         sizes || '[]', 
         colors || '[]', 
-        inStock === 'true' ? 1 : 0, 
-        featured === 'true' ? 1 : 0, 
+        inStock === 'true' || inStock === true || inStock === undefined || inStock === null ? 1 : 0, 
+        featured === 'true' || featured === true ? 1 : 0, 
         req.params.id
     ], function(err) {
         if (err) return res.status(500).json({ error: err.message });

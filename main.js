@@ -179,10 +179,8 @@ document.addEventListener("DOMContentLoaded", () => {
         const prodRes = await fetch(`${API_BASE}/products`);
         if (!prodRes.ok) throw new Error(`HTTP ${prodRes.status}`);
         const apiProducts = await prodRes.json();
-        if (Array.isArray(apiProducts) && apiProducts.length > 0) {
+        if (Array.isArray(apiProducts)) {
             products = apiProducts;
-        } else {
-            throw new Error('Empty products response');
         }
     } catch(err) {
         console.warn("API unavailable, using local products.js data:", err.message);
