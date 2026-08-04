@@ -1,21 +1,85 @@
 const API_URL = window.location.origin + '/api';
 let authToken = localStorage.getItem('adminToken') || null;
 
+// ─── Session Timeout (10 minutes inactivity auto-logout) ──────────────────
+const SESSION_TIMEOUT_MS  = 10 * 60 * 1000;   // 10 minutes
+const SESSION_WARNING_MS  = 60 * 1000;         // warn 60 s before
+let   sessionTimer        = null;
+let   warningTimer        = null;
+let   countdownInterval   = null;
+
+function resetSessionTimer() {
+    clearTimeout(sessionTimer);
+    clearTimeout(warningTimer);
+    clearInterval(countdownInterval);
+    hideSessionWarning();
+
+    if (!authToken) return;   // not logged in, skip
+
+    // Set warning at (TIMEOUT - WARNING)
+    warningTimer = setTimeout(() => {
+        showSessionWarning();
+    }, SESSION_TIMEOUT_MS - SESSION_WARNING_MS);
+
+    // Set forced logout at TIMEOUT
+    sessionTimer = setTimeout(() => {
+        forceLogout();
+    }, SESSION_TIMEOUT_MS);
+}
+
+function showSessionWarning() {
+    const overlay = document.getElementById('sessionWarningOverlay');
+    if (!overlay) return;
+    overlay.style.display = 'flex';
+    let secs = Math.round(SESSION_WARNING_MS / 1000);
+    document.getElementById('sessionCountdown').textContent = secs;
+    countdownInterval = setInterval(() => {
+        secs--;
+        const el = document.getElementById('sessionCountdown');
+        if (el) el.textContent = secs;
+        if (secs <= 0) clearInterval(countdownInterval);
+    }, 1000);
+}
+function hideSessionWarning() {
+    const overlay = document.getElementById('sessionWarningOverlay');
+    if (overlay) overlay.style.display = 'none';
+    clearInterval(countdownInterval);
+}
+function extendSession() {
+    // Re-login silently using stored credentials is not possible without password;
+    // instead just reset the local timer (token still expires server-side)
+    resetSessionTimer();
+}
+function forceLogout() {
+    clearTimeout(sessionTimer);
+    clearTimeout(warningTimer);
+    clearInterval(countdownInterval);
+    authToken = null;
+    localStorage.removeItem('adminToken');
+    showLogin();
+    hideSessionWarning();
+}
+
+// Reset timer on any user activity
+['mousemove', 'keydown', 'mousedown', 'touchstart', 'scroll'].forEach(evt => {
+    document.addEventListener(evt, resetSessionTimer, { passive: true });
+});
+
 // --- DOM Elements ---
-const loginScreen = document.getElementById('loginScreen');
-const adminDashboard = document.getElementById('adminDashboard');
-const loginForm = document.getElementById('adminLoginForm');
-const loginError = document.getElementById('loginError');
-const logoutBtn = document.getElementById('logoutBtn');
+const loginScreen      = document.getElementById('loginScreen');
+const adminDashboard   = document.getElementById('adminDashboard');
+const loginForm        = document.getElementById('adminLoginForm');
+const loginError       = document.getElementById('loginError');
+const logoutBtn        = document.getElementById('logoutBtn');
 
 // Navigation
-const navBtns = document.querySelectorAll('.admin-nav-btn');
-const sections = document.querySelectorAll('.admin-section');
+const navBtns   = document.querySelectorAll('.admin-nav-btn');
+const sections  = document.querySelectorAll('.admin-section');
 
 // Forms & Views
 const paymentSettingsForm = document.getElementById('paymentSettingsForm');
-const accountForm = document.getElementById('accountForm');
-const productForm = document.getElementById('productForm');
+const accountForm         = document.getElementById('accountForm');
+const productForm         = document.getElementById('productForm');
 
 // Initialization
 document.addEventListener('DOMContentLoaded', () => {
@@ -125,13 +189,19 @@ function setColorWidget(n, colorObj) {
 function showLogin() {
     loginScreen.style.display = 'flex';
     adminDashboard.style.display = 'none';
+    // Clear any running timers
+    clearTimeout(sessionTimer);
+    clearTimeout(warningTimer);
+    clearInterval(countdownInterval);
+    hideSessionWarning();
 }
 
 function showDashboard() {
     loginScreen.style.display = 'none';
     adminDashboard.style.display = 'flex';
-    fetchOrders(); // Default view
+    fetchOrders();
     fetchSettings();
+    resetSessionTimer();   // Start the 10-minute idle timer
 }
 
 loginForm.addEventListener('submit', async (e) => {
@@ -160,9 +230,7 @@ loginForm.addEventListener('submit', async (e) => {
 });
 
 logoutBtn.addEventListener('click', () => {
-    authToken = null;
-    localStorage.removeItem('adminToken');
-    showLogin();
+    forceLogout();
 });
 
 // --- Navigation ---
@@ -213,13 +281,67 @@ accountForm.addEventListener('submit', async (e) => {
 // --- Settings Management ---
 async function fetchSettings() {
     try {
-        const res = await fetch(`${API_URL}/settings`);
+        const res  = await fetch(`${API_URL}/settings`);
         const data = await res.json();
-        if (data.bank_account) document.getElementById('setBank').value = data.bank_account;
-        if (data.instapay) document.getElementById('setInstapay').value = data.instapay;
-        if (data.ewallets) document.getElementById('setEwallets').value = data.ewallets;
-        if (data.cash_on_delivery_enabled) document.getElementById('setCod').checked = (data.cash_on_delivery_enabled === 'true');
+
+        // Payment fields
+        if (data.bank_account)           document.getElementById('setBank').value    = data.bank_account;
+        if (data.instapay)               document.getElementById('setInstapay').value = data.instapay;
+        if (data.ewallets)               document.getElementById('setEwallets').value  = data.ewallets;
+        if (data.cash_on_delivery_enabled)
+            document.getElementById('setCod').checked = (data.cash_on_delivery_enabled === 'true');
+
+        // Announcement fields
+        const annText    = document.getElementById('setAnnouncementText');
+        const annEnabled = document.getElementById('setAnnouncementEnabled');
+        if (annText    && data.announcement_text    !== undefined) annText.value       = data.announcement_text;
+        if (annEnabled && data.announcement_enabled !== undefined) annEnabled.checked  = (data.announcement_enabled === 'true');
     } catch(err) { console.error(err); }
+}
+
+async function saveAnnouncementSettings() {
+    const text    = document.getElementById('setAnnouncementText').value.trim();
+    const enabled = document.getElementById('setAnnouncementEnabled').checked;
+    const feedback = document.getElementById('announcementFeedback');
+
+    try {
+        const res = await fetch(`${API_URL}/settings`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+            body: JSON.stringify({ announcement_text: text, announcement_enabled: enabled.toString() })
+        });
+        if (res.ok) {
+            feedback.style.color = 'var(--color-success)';
+            feedback.textContent = '✅ تم حفظ الإعلان بنجاح';
+        } else {
+            const d = await res.json();
+            if (res.status === 401 || res.status === 403) { forceLogout(); return; }
+            feedback.style.color = 'var(--color-danger)';
+            feedback.textContent = d.error || 'حدث خطأ';
+        }
+    } catch(err) {
+        feedback.textContent = 'خطأ في الاتصال';
+    }
+    setTimeout(() => { feedback.textContent = ''; }, 3500);
+}
+
+async function clearAnnouncement() {
+    if (!confirm('هل تريد حذف نص الإعلان وإخفاء الشريط؟')) return;
+    const feedback = document.getElementById('announcementFeedback');
+    try {
+        const res = await fetch(`${API_URL}/settings`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+            body: JSON.stringify({ announcement_text: '', announcement_enabled: 'false' })
+        });
+        if (res.ok) {
+            document.getElementById('setAnnouncementText').value = '';
+            document.getElementById('setAnnouncementEnabled').checked = false;
+            feedback.style.color = 'var(--color-success)';
+            feedback.textContent = '✅ تم حذف الإعلان';
+        } else if (res.status === 401 || res.status === 403) { forceLogout(); return; }
+    } catch(err) { feedback.textContent = 'خطأ في الاتصال'; }
+    setTimeout(() => { feedback.textContent = ''; }, 3500);
 }
 
 paymentSettingsForm.addEventListener('submit', async (e) => {

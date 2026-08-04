@@ -1,12 +1,14 @@
-const express = require('express');
-const cors = require('cors');
-const bcrypt = require('bcrypt');
-const jwt = require('jsonwebtoken');
-const db = require('./database');
-const path = require('path');
-const multer = require('multer');
-const fs = require('fs');
+const express    = require('express');
+const cors       = require('cors');
+const bcrypt     = require('bcrypt');
+const jwt        = require('jsonwebtoken');
+const db         = require('./database');
+const path       = require('path');
+const multer     = require('multer');
+const fs         = require('fs');
 const cloudinary = require('cloudinary').v2;
+const helmet     = require('helmet');
+const rateLimit  = require('express-rate-limit');
 
 // Load local .env file variables if present (does NOT override real env vars on Render)
 const envPath = path.join(__dirname, '.env');
@@ -103,12 +105,39 @@ const uploadImage = async (file) => {
 const storage = multer.memoryStorage();
 const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } });
 
-// Middleware
-app.use(cors());
-app.use(express.json());
+// ─── Security: Rate Limiter (login endpoint) ───────────────────────────
+const loginLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,   // 15 minutes
+    max: 5,                      // 5 attempts per window
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'عدد محاولات تسجيل الدخول تجاوز الحد المسموح. حاول مرة أخرى بعد 15 دقيقة.' },
+    skipSuccessfulRequests: true // Don't count successful logins
+});
+
+// ─── Middleware ────────────────────────────────────────────────────────────
+app.use(helmet({
+    contentSecurityPolicy: {
+        directives: {
+            defaultSrc:  ["'self'"],
+            scriptSrc:   ["'self'", "'unsafe-inline'", "https://accounts.google.com", "https://cdnjs.cloudflare.com", "https://fonts.googleapis.com"],
+            styleSrc:    ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://cdnjs.cloudflare.com"],
+            fontSrc:     ["'self'", "https://fonts.gstatic.com", "https://cdnjs.cloudflare.com"],
+            imgSrc:      ["'self'", "data:", "https://res.cloudinary.com", "https://lh3.googleusercontent.com", "blob:"],
+            connectSrc:  ["'self'", "https://accounts.google.com", "https://oauth2.googleapis.com"],
+            frameSrc:    ["'none'"],
+            objectSrc:   ["'none'"],
+            upgradeInsecureRequests: []
+        }
+    },
+    crossOriginEmbedderPolicy: false // Allow Google fonts/CDN
+}));
+app.use(cors({ origin: true, credentials: true }));
+app.use(express.json({ limit: '2mb' }));         // Limit JSON body size
+app.use(express.urlencoded({ extended: false, limit: '2mb' }));
 app.use('/assets/images', express.static(path.join(__dirname, '../assets/images')));
-app.use('/uploads', express.static(path.join(__dirname, 'uploads'))); // For future uploaded images
-app.use(express.static(path.join(__dirname, '../'))); // Serve static files from the parent directory (frontend)
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use(express.static(path.join(__dirname, '../')));
 
 // Authentication Middleware
 const authenticateToken = (req, res, next) => {
@@ -132,39 +161,49 @@ const isAdmin = (req, res, next) => {
 };
 
 // ======================== AUTH ROUTES ========================
-// Login
-app.post('/api/auth/login', (req, res) => {
+// Login — protected by rate limiter
+app.post('/api/auth/login', loginLimiter, (req, res) => {
     const { username, password } = req.body;
-    db.get("SELECT * FROM users WHERE username = ?", [username], (err, user) => {
-        if (err || !user) return res.status(400).json({ error: "Invalid username or password" });
+    if (!username || !password) {
+        return res.status(400).json({ error: 'اسم المستخدم وكلمة المرور مطلوبان' });
+    }
+    db.get("SELECT * FROM users WHERE username = ?", [username.trim()], (err, user) => {
+        if (err || !user) {
+            // Uniform error: don't reveal whether user exists
+            return res.status(400).json({ error: 'اسم المستخدم أو كلمة المرور غير صحيحة' });
+        }
 
         if (bcrypt.compareSync(password, user.password)) {
-            const token = jwt.sign({ id: user.id, username: user.username, role: user.role }, SECRET_KEY, { expiresIn: '24h' });
+            // Admin gets short-lived 10-min token; regular users get 24h
+            const expiresIn = user.role === 'admin' ? '10m' : '24h';
+            const token = jwt.sign(
+                { id: user.id, username: user.username, role: user.role },
+                SECRET_KEY,
+                { expiresIn }
+            );
             res.json({ token, role: user.role });
         } else {
-            res.status(400).json({ error: "Invalid username or password" });
+            res.status(400).json({ error: 'اسم المستخدم أو كلمة المرور غير صحيحة' });
         }
     });
 });
 
-// Register User
+// Register User (disabled for admin panel — admin is seeded)
 app.post('/api/auth/register', (req, res) => {
     const { username, password } = req.body;
-    if (!username || !password) {
-        return res.status(400).json({ error: "اسم المستخدم وكلمة المرور مطلوبان" });
+    if (!username || !password || username.trim().length < 3 || password.length < 6) {
+        return res.status(400).json({ error: 'البيانات المدخلة غير صالحة' });
     }
-
-    const hash = bcrypt.hashSync(password, 10);
-    db.run("INSERT INTO users (username, password, role) VALUES (?, ?, 'user')", [username, hash], function(err) {
+    const hash = bcrypt.hashSync(password, 12);  // bcrypt cost 12 (was 10)
+    db.run("INSERT INTO users (username, password, role) VALUES (?, ?, 'user')", [username.trim(), hash], function(err) {
         if (err) {
-            if (err.message.includes("UNIQUE constraint failed")) {
-                return res.status(400).json({ error: "اسم المستخدم مسجل بالفعل" });
+            if (err.message.includes('UNIQUE constraint failed')) {
+                return res.status(400).json({ error: 'اسم المستخدم مسجل بالفعل' });
             }
-            return res.status(500).json({ error: err.message });
+            return res.status(500).json({ error: 'خطأ في الخادم' });
         }
-
         const token = jwt.sign({ id: this.lastID, username, role: 'user' }, SECRET_KEY, { expiresIn: '24h' });
-        res.json({ token, role: 'user', message: "تم تسجيل الحساب بنجاح" });
+        res.json({ token, role: 'user', message: 'تم تسجيل الحساب بنجاح' });
     });
 });
 
@@ -375,7 +414,7 @@ app.delete('/api/products/:id', authenticateToken, isAdmin, (req, res) => {
 
 // ======================== SETTINGS ROUTES ========================
 app.get('/api/settings', (req, res) => {
-    db.all("SELECT * FROM settings", [], (err, rows) => {
+    db.all('SELECT * FROM settings', [], (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });
         const settings = {};
         rows.forEach(r => { settings[r.key] = r.value; });
@@ -384,28 +423,28 @@ app.get('/api/settings', (req, res) => {
 });
 
 app.put('/api/settings', authenticateToken, isAdmin, async (req, res) => {
-    const { bank_account, instapay, ewallets, cash_on_delivery_enabled } = req.body;
-    const updates = [];
-    
-    const runQuery = (key, val) => {
-        return new Promise((resolve, reject) => {
-            db.run("UPDATE settings SET value = ? WHERE key = ?", [val, key], (err) => {
-                if (err) reject(err);
-                else resolve();
-            });
-        });
-    };
+    const allowed = [
+        'bank_account', 'instapay', 'ewallets',
+        'cash_on_delivery_enabled',
+        'announcement_text', 'announcement_enabled'
+    ];
+
+    const upsert = (key, val) => new Promise((resolve, reject) => {
+        db.run(
+            `INSERT INTO settings (key, value) VALUES (?, ?)
+             ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+            [key, String(val)],
+            err => err ? reject(err) : resolve()
+        );
+    });
 
     try {
-        if (bank_account !== undefined) updates.push(runQuery('bank_account', bank_account));
-        if (instapay !== undefined) updates.push(runQuery('instapay', instapay));
-        if (ewallets !== undefined) updates.push(runQuery('ewallets', ewallets));
-        if (cash_on_delivery_enabled !== undefined) {
-            updates.push(runQuery('cash_on_delivery_enabled', cash_on_delivery_enabled.toString()));
-        }
-        
+        const updates = [];
+        allowed.forEach(key => {
+            if (req.body[key] !== undefined) updates.push(upsert(key, req.body[key]));
+        });
         await Promise.all(updates);
-        res.json({ message: "Settings updated successfully" });
+        res.json({ message: 'Settings updated successfully' });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }

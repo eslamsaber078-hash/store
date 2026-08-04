@@ -234,10 +234,12 @@ function initDb() {
         db.get("SELECT COUNT(*) as count FROM settings", [], (err, row) => {
             if (!row || row.count !== 0) return;
             const defaultSettings = [
-                { key: 'bank_account',           value: 'EG12345678901234567890 (البنك الأهلي)' },
-                { key: 'instapay',                value: 'eslam.bk@instapay' },
-                { key: 'ewallets',                value: '01190622530 (فودافون كاش)' },
-                { key: 'cash_on_delivery_enabled', value: 'true' }
+                { key: 'bank_account',             value: 'EG12345678901234567890 (البنك الأهلي)' },
+                { key: 'instapay',                  value: 'eslam.bk@instapay' },
+                { key: 'ewallets',                  value: '01190622530 (فودافون كاش)' },
+                { key: 'cash_on_delivery_enabled',  value: 'true' },
+                { key: 'announcement_text',         value: '🚚 شحن مجاني للطلبات أكثر من 3,000 ج.م | استخدم كود DAVINCI10 للحصول على خصم 10%' },
+                { key: 'announcement_enabled',      value: 'true' }
             ];
             const stmt = db.prepare("INSERT INTO settings (key, value) VALUES (?, ?)");
             defaultSettings.forEach(s => stmt.run(s.key, s.value));

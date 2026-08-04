@@ -224,21 +224,147 @@ img {
   border-bottom: 1px solid var(--color-border);
 }
 
-/* Announcement Bar */
+/* ══════════════════════════════════════════════════════
+   ANNOUNCEMENT BAR — Animated Ticker
+   ══════════════════════════════════════════════════════ */
 .announcement-bar {
-  background-color: #000;
-  color: var(--color-text-secondary);
-  font-size: 0.75rem;
-  padding: 8px 20px;
-  text-align: center;
-  border-bottom: 1px solid var(--color-border);
-  font-weight: 500;
+  position: relative;
+  background: linear-gradient(90deg, #0a0a0a 0%, #1a1200 30%, #2a1a00 50%, #1a1200 70%, #0a0a0a 100%);
+  border-bottom: 1px solid rgba(212, 175, 55, 0.25);
+  height: 38px;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  z-index: 10;
+  transition: height 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.35s ease;
 }
-.promo-code-badge {
+.announcement-bar.hidden {
+  height: 0;
+  opacity: 0;
+  pointer-events: none;
+  border: none;
+}
+
+/* Subtle shimmer overlay */
+.announcement-bar::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(212, 175, 55, 0.05) 50%,
+    transparent 100%
+  );
+  animation: shimmerBar 3s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes shimmerBar {
+  0%, 100% { opacity: 0; }
+  50%       { opacity: 1; }
+}
+
+/* Track wrapper — clips the scrolling text */
+.announcement-track-wrapper {
+  flex: 1;
+  overflow: hidden;
+  min-width: 0;
+  mask-image: linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%);
+}
+
+/* Track — two copies of the text side by side for seamless loop */
+.announcement-track {
+  display: flex;
+  width: max-content;
+  animation: tickerScroll 30s linear infinite;
+}
+.announcement-track:hover {
+  animation-play-state: paused;
+}
+@keyframes tickerScroll {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+/* Each item */
+.announcement-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 60px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  font-family: var(--font-primary);
+}
+
+.announcement-icon {
   color: var(--color-gold);
-  font-weight: 700;
-  letter-spacing: 1px;
+  font-size: 0.8rem;
+  flex-shrink: 0;
 }
+.announcement-divider {
+  color: rgba(212, 175, 55, 0.4);
+  font-size: 1rem;
+  margin: 0 8px;
+}
+
+/* Promo code badge — pulsing gold pill */
+.promo-code-badge {
+  display: inline-flex;
+  align-items: center;
+  background: linear-gradient(135deg, var(--color-gold), #c8950a);
+  color: #000;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-family: var(--font-display);
+  box-shadow: 0 0 8px rgba(212, 175, 55, 0.5);
+  animation: badgePulse 2.5s ease-in-out infinite;
+}
+@keyframes badgePulse {
+  0%, 100% { box-shadow: 0 0 6px rgba(212, 175, 55, 0.4); }
+  50%       { box-shadow: 0 0 14px rgba(212, 175, 55, 0.8); }
+}
+
+/* Close button */
+.announcement-close {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid rgba(212, 175, 55, 0.3);
+  background: rgba(212, 175, 55, 0.08);
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.75rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 12px;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+  line-height: 1;
+}
+.announcement-close:hover {
+  background: rgba(212, 175, 55, 0.2);
+  border-color: var(--color-gold);
+  color: #fff;
+}
+
+/* Mobile: slightly smaller */
+@media (max-width: 480px) {
+  .announcement-bar  { height: 32px; }
+  .announcement-item { font-size: 0.72rem; padding: 0 40px; }
+  .promo-code-badge  { font-size: 0.68rem; }
+  .announcement-close{ width: 24px; height: 24px; margin-right: 8px; }
+}
+
 
 /* Main Navbar */
 .navbar-container {

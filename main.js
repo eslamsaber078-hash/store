@@ -198,6 +198,9 @@ document.addEventListener("DOMContentLoaded", () => {
         const settings = await setRes.json();
         paymentSettings = settings;
         setupDynamicPaymentMethods(settings);
+
+        // ── Load announcement bar from settings ──────────────────────────
+        initAnnouncementBar(settings);
     } catch(err) {
         console.error("Failed to load settings from server", err);
     }
@@ -211,6 +214,55 @@ document.addEventListener("DOMContentLoaded", () => {
     updateAuthStateUI();
     initGoogleSignIn();
   }
+
+  // ── Announcement Bar logic ────────────────────────────────────────────────
+  function initAnnouncementBar(settings) {
+    const bar       = document.getElementById('announcementBar');
+    const closeBtn  = document.getElementById('announcementClose');
+    if (!bar) return;
+
+    const enabled = settings.announcement_enabled !== 'false';
+    const text    = (settings.announcement_text || '').trim();
+
+    // If disabled by admin OR no text OR user already closed it this session
+    if (!enabled || !text || sessionStorage.getItem('announcementClosed') === '1') {
+        bar.classList.add('hidden');
+        return;
+    }
+
+    // Update both ticker spans with new text (safely — no innerHTML from user input)
+    const items = bar.querySelectorAll('.announcement-item');
+    items.forEach(item => {
+        // Preserve icons — only update the text node
+        item.childNodes.forEach(node => {
+            if (node.nodeType === Node.TEXT_NODE) node.textContent = '';
+        });
+        // Rebuild inner content safely
+        item.textContent = '';
+        const icon1 = document.createElement('i');
+        icon1.className = 'fa-solid fa-truck-fast announcement-icon';
+        const div   = document.createElement('span');
+        div.className = 'announcement-divider';
+        div.textContent = '|';
+        const icon2 = document.createElement('i');
+        icon2.className = 'fa-solid fa-tag announcement-icon';
+        item.appendChild(icon1);
+        item.appendChild(document.createTextNode(' ' + text + ' '));
+        item.appendChild(div);
+        item.appendChild(icon2);
+    });
+
+    bar.classList.remove('hidden');
+
+    // Close button
+    if (closeBtn) {
+        closeBtn.addEventListener('click', () => {
+            bar.classList.add('hidden');
+            sessionStorage.setItem('announcementClosed', '1');
+        });
+    }
+  }
+
 
   function setupDynamicPaymentMethods(settings) {
     const paymentContainer = document.getElementById("checkoutStep2");

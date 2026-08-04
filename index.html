@@ -25,9 +25,31 @@
   <!-- ==================== HEADER ==================== -->
   <header class="main-header" id="mainHeader">
     <!-- Announcement Bar -->
-    <div class="announcement-bar">
-      <p>شحن مجاني سريع للطلبات أكثر من 3,000 ج.م | استخدم كود <span class="promo-code-badge">DAVINCI10</span> للحصول على خصم 10%</p>
+    <div class="announcement-bar" id="announcementBar">
+      <div class="announcement-track-wrapper">
+        <div class="announcement-track" id="announcementTrack">
+          <span class="announcement-item" id="announcementText">
+            <i class="fa-solid fa-truck-fast announcement-icon"></i>
+            شحن مجاني سريع للطلبات أكثر من 3,000 ج.م
+            <span class="announcement-divider">|</span>
+            <i class="fa-solid fa-tag announcement-icon"></i>
+            استخدم كود <span class="promo-code-badge">DAVINCI10</span> للحصول على خصم 10%
+          </span>
+          <!-- Duplicate for seamless loop -->
+          <span class="announcement-item announcement-duplicate" aria-hidden="true">
+            <i class="fa-solid fa-truck-fast announcement-icon"></i>
+            شحن مجاني سريع للطلبات أكثر من 3,000 ج.م
+            <span class="announcement-divider">|</span>
+            <i class="fa-solid fa-tag announcement-icon"></i>
+            استخدم كود <span class="promo-code-badge">DAVINCI10</span> للحصول على خصم 10%
+          </span>
+        </div>
+      </div>
+      <button class="announcement-close" id="announcementClose" aria-label="إغلاق الإعلان">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
     </div>
+
 
     <!-- Main Navigation Bar -->
     <div class="navbar-container">
