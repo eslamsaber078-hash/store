@@ -616,64 +616,106 @@ app.put('/api/settings', authenticateToken, isAdmin, async (req, res) => {
 });
 
 // Helper function: relative time formatting in Arabic
+js
 function formatRelativeTimeArabic(dateString, dateTextFallback) {
     if (!dateString || dateString === 'CURRENT_DATETIME') {
-        return (dateTextFallback && dateTextFallback !== 'الآن') ? dateTextFallback : 'الآن';
+        return (dateTextFallback && dateTextFallback !== 'الآن')
+            ? dateTextFallback
+            : 'الآن';
     }
-    const date = new Date(dateString.includes('T') || dateString.includes('Z') ? dateString : dateString.replace(' ', 'T') + 'Z');
+
+    // PostgreSQL may return timestamp columns as a Date object.
+    // Convert Date/String safely before parsing.
+    let date;
+
+    if (dateString instanceof Date) {
+        date = dateString;
+    } else {
+        const value = String(dateString);
+
+        const normalizedValue =
+            value.includes('T') || value.includes('Z')
+                ? value
+                : value.replace(' ', 'T') + 'Z';
+
+        date = new Date(normalizedValue);
+    }
+
     if (isNaN(date.getTime())) {
-        return (dateTextFallback && dateTextFallback !== 'الآن') ? dateTextFallback : 'الآن';
+        return (dateTextFallback && dateTextFallback !== 'الآن')
+            ? dateTextFallback
+            : 'الآن';
     }
 
     const now = new Date();
-    const diffSeconds = Math.max(0, Math.floor((now.getTime() - date.getTime()) / 1000));
+    const diffSeconds = Math.max(
+        0,
+        Math.floor((now.getTime() - date.getTime()) / 1000)
+    );
 
     if (diffSeconds < 60) return 'الآن';
 
     const diffMinutes = Math.floor(diffSeconds / 60);
+
     if (diffMinutes < 60) {
         if (diffMinutes === 1) return 'منذ دقيقة';
         if (diffMinutes === 2) return 'منذ دقيقتين';
-        if (diffMinutes >= 3 && diffMinutes <= 10) return `منذ ${diffMinutes} دقائق`;
-        return `منذ ${diffMinutes} دقيقة`;
+        if (diffMinutes >= 3 && diffMinutes <= 10) {
+            return `منذ ${ diffMinutes } دقائق`;
+        }
+        return `منذ ${ diffMinutes } دقيقة`;
     }
 
     const diffHours = Math.floor(diffMinutes / 60);
+
     if (diffHours < 24) {
         if (diffHours === 1) return 'منذ ساعة';
         if (diffHours === 2) return 'منذ ساعتين';
-        if (diffHours >= 3 && diffHours <= 10) return `منذ ${diffHours} ساعات`;
-        return `منذ ${diffHours} ساعة`;
+        if (diffHours >= 3 && diffHours <= 10) {
+            return `منذ ${ diffHours } ساعات`;
+        }
+        return `منذ ${ diffHours } ساعة`;
     }
 
     const diffDays = Math.floor(diffHours / 24);
+
     if (diffDays < 7) {
         if (diffDays === 1) return 'منذ يوم';
         if (diffDays === 2) return 'منذ يومين';
-        if (diffDays >= 3 && diffDays <= 10) return `منذ ${diffDays} أيام`;
-        return `منذ ${diffDays} يوماً`;
+        if (diffDays >= 3 && diffDays <= 10) {
+            return `منذ ${ diffDays } أيام`;
+        }
+        return `منذ ${ diffDays } يوماً`;
     }
 
     const diffWeeks = Math.floor(diffDays / 7);
+
     if (diffWeeks < 4) {
         if (diffWeeks === 1) return 'منذ أسبوع';
         if (diffWeeks === 2) return 'منذ أسبوعين';
-        return `منذ ${diffWeeks} أسابيع`;
+        return `منذ ${ diffWeeks } أسابيع`;
     }
 
     const diffMonths = Math.floor(diffDays / 30);
+
     if (diffMonths < 12) {
         if (diffMonths === 1) return 'منذ شهر';
         if (diffMonths === 2) return 'منذ شهرين';
-        if (diffMonths >= 3 && diffMonths <= 10) return `منذ ${diffMonths} أشهر`;
-        return `منذ ${diffMonths} شهراً`;
+        if (diffMonths >= 3 && diffMonths <= 10) {
+            return `منذ ${ diffMonths } أشهر`;
+        }
+        return `منذ ${ diffMonths } شهراً`;
     }
 
     const diffYears = Math.floor(diffDays / 365);
+
     if (diffYears === 1) return 'منذ سنة';
     if (diffYears === 2) return 'منذ سنتين';
-    return `منذ ${diffYears} سنوات`;
+
+    return `منذ ${ diffYears } سنوات`;
 }
+
+
 
 // ======================== REVIEWS ROUTES ========================
 app.get('/api/reviews', (req, res) => {
