@@ -616,7 +616,7 @@ app.put('/api/settings', authenticateToken, isAdmin, async (req, res) => {
 });
 
 // Helper function: relative time formatting in Arabic
-js
+
 function formatRelativeTimeArabic(dateString, dateTextFallback) {
     if (!dateString || dateString === 'CURRENT_DATETIME') {
         return (dateTextFallback && dateTextFallback !== 'الآن')
