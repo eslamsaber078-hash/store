@@ -6,8 +6,10 @@ document.addEventListener("DOMContentLoaded", () => {
   // --- STATE VARIABLES ---
   let products = [];
   let userToken = localStorage.getItem("userToken") || null;
-  let cart = JSON.parse(localStorage.getItem("davinci_store_cart")) || [];
-  let wishlist = JSON.parse(localStorage.getItem("davinci_store_wishlist")) || [];
+  let cart = [];
+  try { cart = JSON.parse(localStorage.getItem("davinci_store_cart")) || []; } catch(e) { cart = []; }
+  let wishlist = [];
+  try { wishlist = JSON.parse(localStorage.getItem("davinci_store_wishlist")) || []; } catch(e) { wishlist = []; }
   let currentFilter = {
     category: "all",
     searchQuery: "",
@@ -168,10 +170,28 @@ document.addEventListener("DOMContentLoaded", () => {
     newsletterMessage: document.getElementById("newsletterMessage")
   };
 
-  // --- WIDGET & UI INITIALIZATIONS ---
-  const API_BASE = (window.location.protocol === 'http:' || window.location.protocol === 'https:')
-    ? window.location.origin + '/api'
-    : 'http://localhost:3000/api';
+  // Apply saved theme mode immediately from localStorage to prevent flash
+  try {
+    const cachedThemeMode = localStorage.getItem('theme_mode');
+    if (cachedThemeMode === 'light') {
+      document.documentElement.setAttribute('data-theme', 'light');
+    }
+  } catch (e) {}
+
+  window.addEventListener('storage', (e) => {
+    if (e.key === 'theme_mode') {
+      if (e.newValue === 'light') {
+        document.documentElement.setAttribute('data-theme', 'light');
+      } else {
+        document.documentElement.removeAttribute('data-theme');
+      }
+    }
+  });
+
+  const API_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || !window.location.hostname)
+    ? (window.location.protocol.startsWith('http') ? window.location.protocol + '//' + window.location.hostname + ':3000/api' : 'http://localhost:3000/api')
+    : window.location.origin + '/api';
+
   initApp();
 
   async function initApp() {
@@ -199,8 +219,38 @@ document.addEventListener("DOMContentLoaded", () => {
 
         // ── Load announcement bar from settings ──────────────────────────
         initAnnouncementBar(settings);
+
+        // ── Apply custom theme color & mode ───────────────────────────────
+        if (settings.theme_color) {
+            applyThemeColor(settings.theme_color);
+        }
+        if (settings.theme_mode) {
+            localStorage.setItem('theme_mode', settings.theme_mode);
+            applyThemeMode(settings.theme_mode);
+        }
+        // ── Apply custom hero slider content ──────────────────────────────
+        if (settings.hero_slides) {
+            applyHeroSlides(settings.hero_slides);
+        }
+        // ── Apply custom store features (quick stats) ─────────────────────
+        if (settings.store_features) {
+            applyStoreFeatures(settings.store_features);
+        }
+
     } catch(err) {
         console.error("Failed to load settings from server", err);
+    }
+
+    try {
+        const catRes = await fetch(`${API_BASE}/categories`);
+        if (catRes.ok) {
+            const categories = await catRes.json();
+            if (Array.isArray(categories) && categories.length > 0) {
+                applyDynamicCategories(categories);
+            }
+        }
+    } catch(err) {
+        console.warn("Failed to load categories from server", err);
     }
 
     renderProducts();
@@ -212,6 +262,252 @@ document.addEventListener("DOMContentLoaded", () => {
     updateAuthStateUI();
     initGoogleSignIn();
     initGovernorateSelect();
+    loadStoreComments();
+  }
+
+  // ── Dynamic Theme Color Application ─────────────────────────────────────
+  function applyThemeColor(color) {
+    if (!color || typeof color !== 'string') return;
+    const root = document.documentElement;
+    root.style.setProperty('--color-gold', color);
+    
+    let hex = color.replace('#', '');
+    if (hex.length === 3) hex = hex.split('').map(c => c + c).join('');
+    if (hex.length === 6) {
+      const r = parseInt(hex.substring(0, 2), 16);
+      const g = parseInt(hex.substring(2, 4), 16);
+      const b = parseInt(hex.substring(4, 6), 16);
+      root.style.setProperty('--color-gold-light', `rgba(${r}, ${g}, ${b}, 0.15)`);
+      root.style.setProperty('--color-border-focus', `rgba(${r}, ${g}, ${b}, 0.5)`);
+      root.style.setProperty('--shadow-gold', `0 4px 20px rgba(${r}, ${g}, ${b}, 0.15)`);
+    }
+  }
+
+  // ── Dynamic Theme Mode Application (Dark / Light) ──────────────────────────
+  function applyThemeMode(mode) {
+    if (mode === 'light') {
+      document.documentElement.setAttribute('data-theme', 'light');
+      document.body.setAttribute('data-theme', 'light');
+      document.body.classList.add('light-mode');
+    } else {
+      document.documentElement.removeAttribute('data-theme');
+      document.body.removeAttribute('data-theme');
+      document.body.classList.remove('light-mode');
+    }
+  }
+
+  // ── Dynamic Hero Slider Application ──────────────────────────────────────
+  function applyHeroSlides(heroSlidesData) {
+    let slidesArr = [];
+    if (typeof heroSlidesData === 'string') {
+      try {
+        slidesArr = JSON.parse(heroSlidesData);
+      } catch (e) {
+        return;
+      }
+    } else if (Array.isArray(heroSlidesData)) {
+      slidesArr = heroSlidesData;
+    }
+
+    if (!Array.isArray(slidesArr) || slidesArr.length === 0) return;
+
+    const slideEls = document.querySelectorAll('#heroSlider .slide');
+    slidesArr.forEach((sData, index) => {
+      if (slideEls[index]) {
+        const slideEl = slideEls[index];
+        if (sData.image) {
+          slideEl.style.backgroundImage = `linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.75)), url('${sData.image}')`;
+        }
+        const subtitleEl = slideEl.querySelector('.slide-subtitle');
+        if (subtitleEl && sData.subtitle) subtitleEl.textContent = sData.subtitle;
+
+        const titleEl = slideEl.querySelector('.slide-title');
+        if (titleEl && sData.title) titleEl.textContent = sData.title;
+
+        const descEl = slideEl.querySelector('.slide-desc');
+        if (descEl && sData.desc) descEl.textContent = sData.desc;
+      }
+    });
+  }
+
+  // ── Dynamic Store Features Application ───────────────────────────────────
+  function applyStoreFeatures(featuresData) {
+    let features = [];
+    if (typeof featuresData === 'string') {
+      try { features = JSON.parse(featuresData); } catch(e) {}
+    } else if (Array.isArray(featuresData)) {
+      features = featuresData;
+    }
+
+    if (!Array.isArray(features) || features.length === 0) return;
+
+    const container = document.querySelector('.stats-container');
+    if (!container) return;
+
+    container.innerHTML = features.map(f => `
+      <div class="stat-item">
+        <div class="stat-icon"><i class="fa-solid ${f.icon || 'fa-star'}"></i></div>
+        <div class="stat-info">
+          <h4>${f.title}</h4>
+          <p>${f.desc || ''}</p>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  // ── Dynamic Categories Navigation & Filter Application ───────────────────
+  let dynamicCategoriesList = [];
+
+  function getShortCategoryName(cat) {
+    const keyMap = {
+      clothing: "الملابس",
+      shoes: "الأحذية",
+      pants: "البناطيل",
+      accessories: "الإكسسوارات"
+    };
+    if (cat.key && keyMap[cat.key]) return keyMap[cat.key];
+    const name = (cat.name || '').trim();
+    const words = name.split(/\s+/);
+    if (words.length <= 2) return name;
+    return words.slice(0, 2).join(' ');
+  }
+
+  function getFilterCategoryName(cat) {
+    const keyMap = {
+      clothing: "ملابس",
+      shoes: "أحذية",
+      pants: "بناطيل",
+      accessories: "إكسسوارات"
+    };
+    if (cat.key && keyMap[cat.key]) return keyMap[cat.key];
+    return getShortCategoryName(cat);
+  }
+
+  function applyDynamicCategories(categories) {
+    if (!Array.isArray(categories) || categories.length === 0) return;
+    dynamicCategoriesList = categories;
+
+    // Desktop navbar
+    const desktopNavUl = document.querySelector('.desktop-nav ul');
+    if (desktopNavUl) {
+      let navHtml = `<li><a href="#" class="nav-link active" data-category="all">الرئيسية</a></li>`;
+      categories.forEach(cat => {
+        const catKey = cat.key || cat.id;
+        navHtml += `<li><a href="#shop-section" class="nav-link" data-category="${catKey}">${getShortCategoryName(cat)}</a></li>`;
+      });
+      desktopNavUl.innerHTML = navHtml;
+    }
+
+    // Mobile nav drawer
+    const mobileNavUl = document.querySelector('.mobile-nav-links ul');
+    if (mobileNavUl) {
+      let mobileNavHtml = `<li><a href="#" class="mobile-nav-link active" data-category="all">الرئيسية</a></li>`;
+      categories.forEach(cat => {
+        const catKey = cat.key || cat.id;
+        mobileNavHtml += `<li><a href="#shop-section" class="mobile-nav-link" data-category="${catKey}">${getShortCategoryName(cat)}</a></li>`;
+      });
+      mobileNavUl.innerHTML = mobileNavHtml;
+    }
+
+    // Sidebar category filter list
+    const filterCatUl = document.querySelector('.filter-categories-list');
+    if (filterCatUl) {
+      let filterHtml = `<li><button class="cat-filter-btn active" data-cat="all">الكل <span class="cat-count" id="count-all">0</span></button></li>`;
+      categories.forEach(cat => {
+        const catKey = cat.key || cat.id;
+        filterHtml += `<li><button class="cat-filter-btn" data-cat="${catKey}">${getFilterCategoryName(cat)} <span class="cat-count" id="count-${catKey}">0</span></button></li>`;
+      });
+      filterCatUl.innerHTML = filterHtml;
+    }
+
+    // Luxury Showcase Categories Grid (اختر فئتك المفضلة / فئات التسوق الفاخرة)
+    const categoriesGrid = document.querySelector('.categories-grid');
+    if (categoriesGrid && Array.isArray(categories) && categories.length > 0) {
+      let gridHtml = '';
+      categories.forEach(cat => {
+        const catKey = cat.key || cat.id;
+        const imgPath = cat.image || `./assets/images/cat_${catKey}.jpg`;
+        gridHtml += `
+          <a href="#shop-section" class="category-card" data-category="${catKey}">
+            <div class="category-img-container">
+              <img src="${imgPath}" alt="${cat.name}" onerror="this.src='./assets/images/cat_clothing.jpg'">
+              <div class="category-overlay">
+                <h3>${cat.name}</h3>
+                <span class="category-link">تصفح الآن <i class="fa-solid fa-circle-arrow-left"></i></span>
+              </div>
+            </div>
+          </a>
+        `;
+      });
+      categoriesGrid.innerHTML = gridHtml;
+
+      // Re-query category showcase cards and bind click handlers
+      document.querySelectorAll('.categories-grid .category-card').forEach(card => {
+        card.addEventListener('click', () => {
+          const cat = card.getAttribute('data-category');
+          if (cat) {
+            currentFilter.category = cat;
+            elements.navLinks.forEach(l => {
+              l.classList.remove("active");
+              if (l.getAttribute("data-category") === cat) l.classList.add("active");
+            });
+            elements.catFilterBtns.forEach(btn => {
+              btn.classList.remove("active");
+              if (btn.getAttribute("data-cat") === cat) btn.classList.add("active");
+            });
+            renderProducts();
+          }
+        });
+      });
+    }
+
+    // Re-query element lists
+    elements.navLinks = document.querySelectorAll(".nav-link");
+    elements.mobileNavLinks = document.querySelectorAll(".mobile-nav-link");
+    elements.catFilterBtns = document.querySelectorAll(".cat-filter-btn");
+
+    // Re-bind category click handlers
+    const handleCategoryClick = (e) => {
+      const link = e.currentTarget;
+      const cat = link.getAttribute("data-category");
+
+      elements.navLinks.forEach(l => l.classList.remove("active"));
+      elements.mobileNavLinks.forEach(l => l.classList.remove("active"));
+      document.querySelectorAll(`[data-category="${cat}"]`).forEach(el => el.classList.add("active"));
+
+      currentFilter.category = cat;
+
+      elements.catFilterBtns.forEach(btn => {
+        btn.classList.remove("active");
+        if (btn.getAttribute("data-cat") === cat) btn.classList.add("active");
+      });
+
+      renderProducts();
+      closeDrawers();
+    };
+
+    elements.navLinks.forEach(link => link.addEventListener("click", handleCategoryClick));
+    elements.mobileNavLinks.forEach(link => link.addEventListener("click", handleCategoryClick));
+
+    elements.catFilterBtns.forEach(btn => {
+      btn.addEventListener("click", () => {
+        elements.catFilterBtns.forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+
+        const cat = btn.getAttribute("data-cat");
+        currentFilter.category = cat;
+
+        elements.navLinks.forEach(l => {
+          l.classList.remove("active");
+          if (l.getAttribute("data-category") === cat) l.classList.add("active");
+        });
+
+        renderProducts();
+        closeDrawers();
+      });
+    });
+
+    updateCategoryCounts();
   }
 
   // ── Announcement Bar logic (2026 Next-Gen Marquee) ───────────────────────────
@@ -471,7 +767,12 @@ document.addEventListener("DOMContentLoaded", () => {
       pants: "بناطيل وتصميمات عصرية",
       accessories: "ساعات وإكسسوارات النخبة"
     };
-    if (elements.currentCategoryTitle) elements.currentCategoryTitle.innerText = catTitles[currentFilter.category] || "المنتجات الفاخرة";
+    let currentCatTitle = catTitles[currentFilter.category];
+    if (!currentCatTitle && typeof dynamicCategoriesList !== 'undefined' && Array.isArray(dynamicCategoriesList)) {
+      const foundCat = dynamicCategoriesList.find(c => c.key === currentFilter.category || String(c.id) === String(currentFilter.category));
+      if (foundCat) currentCatTitle = foundCat.name;
+    }
+    if (elements.currentCategoryTitle) elements.currentCategoryTitle.innerText = currentCatTitle || "المنتجات الفاخرة";
 
     // Handle Empty State
     if (filteredList.length === 0) {
@@ -553,18 +854,21 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function updateCategoryCounts() {
-    const counts = {
-      all: products.length,
-      clothing: products.filter(p => p.category === "clothing").length,
-      shoes: products.filter(p => p.category === "shoes").length,
-      pants: products.filter(p => p.category === "pants").length,
-      accessories: products.filter(p => p.category === "accessories").length
-    };
+    const counts = { all: products.length };
+    products.forEach(p => {
+      if (p.category) {
+        counts[p.category] = (counts[p.category] || 0) + 1;
+      }
+    });
 
-    for (const key in counts) {
-      const el = document.getElementById(`count-${key}`);
-      if (el) el.innerText = counts[key];
-    }
+    const countEls = document.querySelectorAll(".cat-count");
+    countEls.forEach(el => {
+      const id = el.id || '';
+      if (id.startsWith('count-')) {
+        const catKey = id.replace('count-', '');
+        el.innerText = counts[catKey] || 0;
+      }
+    });
   }
 
   function formatPrice(number) {
@@ -1323,16 +1627,268 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     });
 
-    // Top Search input listener (keyup search)
-    elements.searchInput.addEventListener("keyup", (e) => {
-      currentFilter.searchQuery = e.target.value;
-      elements.sidebarSearchInput.value = e.target.value; // Sync search inputs
+    // ─── Search Suggestions (Autocomplete) ───────────────────────────────────
+    const searchSuggestions = document.getElementById('searchSuggestions');
+    const searchWrapper     = document.getElementById('searchWrapper');
+    const MAX_SUGGESTIONS   = 3;
+    let highlightedIndex    = -1;
+    let suggestionItems     = [];
+
+    /** Calculate and position dropdown dynamically below header / search wrapper */
+    function positionSuggestions() {
+      if (!elements.searchInput || !searchSuggestions) return;
+      const rect = elements.searchInput.getBoundingClientRect();
+      const wrapperEl = elements.searchInput.closest('.search-wrapper') || elements.searchInput;
+      const wrapperRect = wrapperEl.getBoundingClientRect();
+      const viewportW = window.innerWidth;
+      const headerEl = document.querySelector('.main-header');
+      const headerBottom = headerEl ? headerEl.getBoundingClientRect().bottom : rect.bottom;
+      
+      const isMobile = viewportW <= 992 || searchWrapper.classList.contains('mobile-expanded');
+      
+      let topPos, leftPos, dropdownW;
+      
+      if (isMobile) {
+        // Position below entire mobile header bar with clean spacing, centered
+        topPos = Math.max(rect.bottom + 6, headerBottom + 8);
+        dropdownW = Math.min(viewportW - 24, 420);
+        leftPos = Math.max(12, (viewportW - dropdownW) / 2);
+      } else {
+        // Desktop positioning aligned below main header, aligned with search wrapper in RTL
+        topPos = headerBottom + 6;
+        dropdownW = Math.max(wrapperRect.width, 340);
+        leftPos = wrapperRect.right - dropdownW;
+        if (leftPos < 15) leftPos = 15;
+        if (leftPos + dropdownW > viewportW - 15) {
+          leftPos = viewportW - dropdownW - 15;
+        }
+      }
+
+      searchSuggestions.style.top = `${topPos}px`;
+      searchSuggestions.style.left = `${leftPos}px`;
+      searchSuggestions.style.width = `${dropdownW}px`;
+    }
+
+    /** Highlight matched text in a string */
+    function highlightMatch(text, query) {
+      if (!query.trim()) return text;
+      const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      return text.replace(new RegExp(`(${escaped})`, 'gi'), '<mark>$1</mark>');
+    }
+
+    /** Build and show suggestions list */
+    function showSuggestions(query) {
+      positionSuggestions();
+      searchSuggestions.innerHTML = '';
+      highlightedIndex = -1;
+      suggestionItems  = [];
+
+      const q = query.trim().toLowerCase();
+      let matches = [];
+
+      if (q === '') {
+        // Default: show featured/top-rated products as "popular picks"
+        matches = [...products]
+          .filter(p => p.featured || p.rating >= 4.8)
+          .sort((a, b) => (b.rating || 0) - (a.rating || 0))
+          .slice(0, MAX_SUGGESTIONS);
+      } else {
+        matches = products.filter(p =>
+          (p.name        && p.name.toLowerCase().includes(q))        ||
+          (p.categoryName&& p.categoryName.toLowerCase().includes(q))||
+          (p.description && p.description.toLowerCase().includes(q))
+        ).slice(0, MAX_SUGGESTIONS);
+      }
+
+      // Header label
+      const header = document.createElement('div');
+      header.className = 'search-suggestions-header';
+      header.innerHTML = q === ''
+        ? `<i class="fa-solid fa-fire"></i> الأكثر شعبية`
+        : `<i class="fa-solid fa-magnifying-glass"></i> نتائج البحث`;
+      searchSuggestions.appendChild(header);
+
+      if (matches.length === 0) {
+        searchSuggestions.innerHTML += `
+          <div class="search-no-results">
+            <i class="fa-solid fa-face-frown-open"></i>
+            لا توجد منتجات تطابق "<strong>${query}</strong>"
+          </div>`;
+      } else {
+        matches.forEach((product, idx) => {
+          const imgSrc = product.image || (product.images && product.images[0]) || '';
+          const item = document.createElement('div');
+          item.className = 'search-suggestion-item';
+          item.setAttribute('role', 'option');
+          item.setAttribute('data-idx', idx);
+          item.innerHTML = `
+            ${imgSrc
+              ? `<img class="suggestion-img" src="${imgSrc}" alt="${product.name}" loading="lazy" onerror="this.style.display='none'">`
+              : `<div class="suggestion-img-placeholder"><i class="fa-solid fa-shirt"></i></div>`
+            }
+            <div class="suggestion-info">
+              <div class="suggestion-name">${highlightMatch(product.name, query)}</div>
+              <div class="suggestion-meta">${product.categoryName || ''}</div>
+            </div>`;
+
+          item.addEventListener('mousedown', (e) => {
+            e.preventDefault(); // prevent blur from firing before click
+            selectSuggestion(product);
+          });
+
+          searchSuggestions.appendChild(item);
+          suggestionItems.push(item);
+        });
+
+        // Footer: view all results
+        if (q !== '') {
+          const footer = document.createElement('div');
+          footer.className = 'search-suggestions-footer';
+          footer.innerHTML = `<i class="fa-solid fa-arrow-left"></i> عرض كل النتائج (${matches.length})`;
+          footer.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            closeSuggestions();
+            currentFilter.searchQuery = query;
+            elements.sidebarSearchInput.value = query;
+            renderProducts();
+            document.getElementById('shop-section')?.scrollIntoView({ behavior: 'smooth' });
+          });
+          searchSuggestions.appendChild(footer);
+        }
+      }
+
+      searchSuggestions.classList.add('open');
+    }
+
+    /** Select a suggestion → filter products & scroll to shop */
+    function selectSuggestion(product) {
+      elements.searchInput.value = product.name;
+      currentFilter.searchQuery = product.name;
+      elements.sidebarSearchInput.value = product.name;
+      searchWrapper.classList.remove('mobile-expanded');
+      closeSuggestions();
       renderProducts();
+      document.getElementById('shop-section')?.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    /** Close / hide dropdown */
+    function closeSuggestions() {
+      searchSuggestions.classList.remove('open');
+      highlightedIndex = -1;
+    }
+
+    /** Move keyboard highlight */
+    function moveHighlight(dir) {
+      const items = searchSuggestions.querySelectorAll('.search-suggestion-item');
+      if (!items.length) return;
+      items[highlightedIndex]?.classList.remove('highlighted');
+      highlightedIndex = (highlightedIndex + dir + items.length) % items.length;
+      items[highlightedIndex]?.classList.add('highlighted');
+      items[highlightedIndex]?.scrollIntoView({ block: 'nearest' });
+    }
+
+    // Scroll position lock safeguard — prevents native browser scroll jump on input focus/type inside header
+    let searchScrollY = window.scrollY;
+
+    window.addEventListener('scroll', () => {
+      if (document.activeElement !== elements.searchInput) {
+        searchScrollY = window.scrollY;
+      }
+    }, { passive: true });
+
+    // Update position on scroll/resize if open
+    window.addEventListener('resize', () => {
+      if (searchSuggestions.classList.contains('open')) positionSuggestions();
+    });
+    window.addEventListener('scroll', () => {
+      if (searchSuggestions.classList.contains('open')) positionSuggestions();
+    }, { passive: true });
+
+    // Top Search input listener — only updates suggestions dropdown (no grid re-render, no scroll jump)
+    elements.searchInput.addEventListener("input", (e) => {
+      // Prevent native browser scroll-into-view jump on typing
+      if (Math.abs(window.scrollY - searchScrollY) > 5) {
+        window.scrollTo({ top: searchScrollY, behavior: 'instant' });
+      }
+      const val = e.target.value;
+      currentFilter.searchQuery = val;
+      elements.sidebarSearchInput.value = val;
+      showSuggestions(val);
     });
 
-    elements.searchBtn.addEventListener("click", () => {
+    elements.searchInput.addEventListener("keydown", (e) => {
+      if (!searchSuggestions.classList.contains('open')) return;
+      if (e.key === 'ArrowDown') { e.preventDefault(); moveHighlight(1); }
+      else if (e.key === 'ArrowUp')  { e.preventDefault(); moveHighlight(-1); }
+      else if (e.key === 'Enter') {
+        e.preventDefault();
+        const highlighted = searchSuggestions.querySelector('.search-suggestion-item.highlighted');
+        if (highlighted) {
+          const idx = parseInt(highlighted.getAttribute('data-idx'));
+          const q   = elements.searchInput.value.trim().toLowerCase();
+          const matches = q === ''
+            ? [...products].filter(p => p.featured || p.rating >= 4.8).sort((a,b)=>(b.rating||0)-(a.rating||0)).slice(0, MAX_SUGGESTIONS)
+            : products.filter(p =>
+                (p.name && p.name.toLowerCase().includes(q)) ||
+                (p.categoryName && p.categoryName.toLowerCase().includes(q))
+              ).slice(0, MAX_SUGGESTIONS);
+          if (matches[idx]) selectSuggestion(matches[idx]);
+        } else {
+          searchWrapper.classList.remove('mobile-expanded');
+          closeSuggestions();
+          renderProducts();
+          document.getElementById('shop-section')?.scrollIntoView({ behavior: 'smooth' });
+        }
+      }
+      else if (e.key === 'Escape') {
+        searchWrapper.classList.remove('mobile-expanded');
+        closeSuggestions();
+      }
+    });
+
+    elements.searchInput.addEventListener("focus", (e) => {
+      searchScrollY = window.scrollY;
+      showSuggestions(e.target.value);
+    });
+
+    elements.searchInput.addEventListener("blur", () => {
+      // Small delay so mousedown on item fires first
+      setTimeout(closeSuggestions, 150);
+    });
+
+    // Mobile Search Bar Expand / Collapse Logic
+    const closeMobileSearchBtn = document.getElementById('closeMobileSearchBtn');
+
+    if (closeMobileSearchBtn) {
+      closeMobileSearchBtn.addEventListener('click', () => {
+        searchWrapper.classList.remove('mobile-expanded');
+        closeSuggestions();
+      });
+    }
+
+    elements.searchBtn.addEventListener("click", (e) => {
+      // On mobile screens, toggle full-width overlay search bar if not expanded
+      if (window.innerWidth <= 992 && !searchWrapper.classList.contains('mobile-expanded')) {
+        e.preventDefault();
+        e.stopPropagation();
+        searchWrapper.classList.add('mobile-expanded');
+        elements.searchInput.focus();
+        showSuggestions(elements.searchInput.value);
+        return;
+      }
+
       currentFilter.searchQuery = elements.searchInput.value;
+      searchWrapper.classList.remove('mobile-expanded');
+      closeSuggestions();
       renderProducts();
+      document.getElementById('shop-section')?.scrollIntoView({ behavior: 'smooth' });
+    });
+
+    // Close mobile search overlay on click outside
+    document.addEventListener('click', (e) => {
+      if (!searchWrapper.contains(e.target) && !searchSuggestions.contains(e.target)) {
+        searchWrapper.classList.remove('mobile-expanded');
+      }
     });
 
     // Sidebar Search input listener
@@ -1341,6 +1897,8 @@ document.addEventListener("DOMContentLoaded", () => {
       elements.searchInput.value = e.target.value; // Sync search inputs
       renderProducts();
     });
+
+
 
     // Sorting Dropdown selector listener
     elements.sortBySelect.addEventListener("change", (e) => {
@@ -1380,6 +1938,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       elements.searchInput.value = "";
       elements.sidebarSearchInput.value = "";
+      closeSuggestions();
       elements.priceRangeSlider.value = 15000;
       elements.priceMaxVal.innerText = "15,000 ج.م";
       elements.inStockCheckbox.checked = true;
@@ -1982,6 +2541,233 @@ document.addEventListener("DOMContentLoaded", () => {
         closeAuth();
         updateAuthStateUI();
         alert("تم تسجيل الخروج بنجاح");
+    });
+
+
+
+
+
+    function showToastNotification(message) {
+        let toast = document.getElementById('globalToastNotification');
+        if (!toast) {
+            toast = document.createElement('div');
+            toast.id = 'globalToastNotification';
+            toast.style.cssText = `
+                position: fixed;
+                top: 30px;
+                left: 50%;
+                transform: translateX(-50%) translateY(-20px);
+                background: linear-gradient(135deg, rgba(20, 20, 20, 0.95), rgba(30, 30, 30, 0.95));
+                color: var(--color-gold);
+                border: 1px solid var(--color-gold);
+                padding: 14px 30px;
+                border-radius: 40px;
+                font-weight: 700;
+                font-size: 0.95rem;
+                box-shadow: 0 12px 35px rgba(0,0,0,0.6), 0 0 25px rgba(212,175,55,0.3);
+                backdrop-filter: blur(12px);
+                z-index: 10000;
+                opacity: 0;
+                transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+                pointer-events: none;
+                text-align: center;
+            `;
+            document.body.appendChild(toast);
+        }
+        toast.innerText = message;
+        toast.style.opacity = '1';
+        toast.style.transform = 'translateX(-50%) translateY(0)';
+
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateX(-50%) translateY(-20px)';
+        }, 3500);
+    }
+
+
+    // ── STORE COMMENTS LOGIC ─────────────────────────────────────────
+    const storeCommentForm  = document.getElementById('storeCommentForm');
+    const storeCommentsList  = document.getElementById('storeCommentsList');
+    const commentStarPicker = document.getElementById('commentStarPicker');
+    const commentRatingVal  = document.getElementById('commentRatingVal');
+
+    // Interactive Star Picker
+    if (commentStarPicker) {
+        commentStarPicker.addEventListener('click', (e) => {
+            const star = e.target.closest('i');
+            if (!star) return;
+            const rating = parseInt(star.dataset.value || '5', 10);
+            if (commentRatingVal) commentRatingVal.value = rating;
+
+            const stars = commentStarPicker.querySelectorAll('i');
+            stars.forEach((s, i) => {
+                if (i < rating) {
+                    s.classList.add('active');
+                } else {
+                    s.classList.remove('active');
+                }
+            });
+        });
+    }
+
+    // Scroll buttons navigation
+    const scrollUpBtn = document.getElementById('scrollCommentsUpBtn');
+    const scrollDownBtn = document.getElementById('scrollCommentsDownBtn');
+
+    if (scrollUpBtn && storeCommentsList) {
+        scrollUpBtn.addEventListener('click', () => {
+            storeCommentsList.scrollBy({ top: -220, behavior: 'smooth' });
+        });
+    }
+
+    if (scrollDownBtn && storeCommentsList) {
+        scrollDownBtn.addEventListener('click', () => {
+            storeCommentsList.scrollBy({ top: 220, behavior: 'smooth' });
+        });
+    }
+
+    // Helper: Escape HTML
+    function sanitizeText(str) {
+        if (!str) return '';
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+
+    // Helper: Build Star Rating HTML
+    function buildStarsHtml(rating) {
+        const count = Math.max(1, Math.min(5, Math.round(rating || 5)));
+        let html = '';
+        for (let i = 1; i <= 5; i++) {
+            if (i <= count) {
+                html += '<i class="fa-solid fa-star"></i>';
+            } else {
+                html += '<i class="fa-regular fa-star" style="opacity: 0.3;"></i>';
+            }
+        }
+        return html;
+    }
+
+    // Load Comments from Server
+    async function loadStoreComments() {
+        const commentsSection   = document.querySelector('.store-comments-section');
+        const summaryCard       = document.getElementById('commentsSummaryCard');
+        const interactiveLayout = document.getElementById('commentsEnabledInteractiveLayout');
+        if (!storeCommentsList && !commentsSection) return;
+
+        try {
+            const res = await fetch(`${API_BASE}/reviews`);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+            
+            const isEnabled = !(data.enabled === false || data.enabled === 'false');
+
+            // Summary Card is ALWAYS visible in both cases
+            if (summaryCard) summaryCard.style.display = 'block';
+
+            if (isEnabled) {
+                // When comments ARE ENABLED: Show interactive form & comments feed
+                if (interactiveLayout) interactiveLayout.style.display = 'grid';
+                renderCommentsFeed(data.reviews || []);
+            } else {
+                // When comments ARE DISABLED: Hide interactive form & comments feed
+                if (interactiveLayout) interactiveLayout.style.display = 'none';
+            }
+        } catch (err) {
+            console.warn('[Comments] Load error:', err.message);
+        }
+    }
+
+    // Render Comments Feed
+    function renderCommentsFeed(comments) {
+        if (!storeCommentsList) return;
+        if (!comments || comments.length === 0) {
+            storeCommentsList.innerHTML = `<p style="text-align: center; color: var(--color-text-muted); padding: 30px 0;">لا توجد تعليقات بعد. كن أول من يضيف رأيه!</p>`;
+            return;
+        }
+
+        storeCommentsList.innerHTML = comments.map(c => `
+            <div class="comment-card">
+                <div class="comment-card-header">
+                    <div class="comment-user-info">
+                        <div class="comment-avatar">${sanitizeText((c.name || 'ع')[0]).toUpperCase()}</div>
+                        <div>
+                            <h4 class="comment-author-name">${sanitizeText(c.name || 'عميل المتجر')}</h4>
+                            <span class="comment-date">${sanitizeText(c.dateText || 'حديثاً')}</span>
+                        </div>
+                    </div>
+                    <div class="comment-stars">${buildStarsHtml(c.rating)}</div>
+                </div>
+                <p class="comment-body">${sanitizeText(c.comment)}</p>
+            </div>
+        `).join('');
+    }
+
+    // Submit Comment Handler
+    if (storeCommentForm) {
+        storeCommentForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const name = document.getElementById('commentAuthorName').value.trim();
+            const rating = parseInt(commentRatingVal ? commentRatingVal.value : '5', 10);
+            const comment = document.getElementById('commentTextContent').value.trim();
+
+            if (!name || !comment) return;
+
+            const submitBtn = document.getElementById('submitCommentBtn');
+            if (submitBtn) submitBtn.disabled = true;
+
+            try {
+                const res = await fetch(`${API_BASE}/reviews`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, rating, comment })
+                });
+
+                if (res.ok) {
+                    storeCommentForm.reset();
+                    if (commentRatingVal) commentRatingVal.value = '5';
+                    if (commentStarPicker) {
+                        commentStarPicker.querySelectorAll('i').forEach(s => s.classList.add('active'));
+                    }
+
+                    showToastNotification("✨ تم إرسال تعليقك بنجاح! شكراً لمشاركتك.");
+                    await loadStoreComments();
+                } else {
+                    const data = await res.json().catch(() => ({}));
+                    showToastNotification('❌ ' + (data.error || 'حدث خطأ أثناء إرسال التعليق'));
+                }
+            } catch (err) {
+                console.error('[Comments] Post error:', err);
+                showToastNotification('❌ خطأ في الاتصال بالخادم.');
+            } finally {
+                if (submitBtn) submitBtn.disabled = false;
+            }
+        });
+    }
+
+    // Initial load
+    loadStoreComments();
+
+    // Global ESC Key Handler to close drawers, modals, and search suggestions
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' || e.keyCode === 27) {
+            closeDrawers();
+            
+            // Close modals
+            const modals = ['checkoutModal', 'paymentGateModal', 'quickViewModal', 'userAuthModal', 'successModal'];
+            modals.forEach(id => {
+                const modal = document.getElementById(id);
+                if (modal && modal.classList.contains('active')) {
+                    modal.classList.remove('active');
+                }
+            });
+
+            // Close search suggestions
+            const suggestions = document.getElementById('searchSuggestions');
+            if (suggestions) suggestions.style.display = 'none';
+
+            document.body.style.overflow = '';
+        }
     });
 
   }

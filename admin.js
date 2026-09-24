@@ -1,7 +1,7 @@
-const API_URL = (window.location.protocol === 'http:' || window.location.protocol === 'https:')
-    ? window.location.origin + '/api'
-    : 'http://localhost:3000/api';
-let authToken = localStorage.getItem('adminToken') || null;
+const API_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || !window.location.hostname)
+    ? (window.location.protocol.startsWith('http') ? window.location.protocol + '//' + window.location.hostname + ':3000/api' : 'http://localhost:3000/api')
+    : window.location.origin + '/api';
+let authToken = localStorage.getItem('adminToken') || localStorage.getItem('authToken') || null;
 
 // ─── Session Timeout (10 minutes inactivity auto-logout) ──────────────────
 const SESSION_TIMEOUT_MS  = 10 * 60 * 1000;   // 10 minutes
@@ -58,6 +58,8 @@ function forceLogout() {
     clearInterval(countdownInterval);
     authToken = null;
     localStorage.removeItem('adminToken');
+    localStorage.removeItem('authToken');
+    document.documentElement.classList.remove('user-authenticated');
     showLogin();
     hideSessionWarning();
 }
@@ -189,8 +191,9 @@ function setColorWidget(n, colorObj) {
 
 // --- Auth Functions ---
 function showLogin() {
-    loginScreen.style.display = 'flex';
-    adminDashboard.style.display = 'none';
+    document.documentElement.classList.remove('user-authenticated');
+    if (loginScreen) loginScreen.style.display = 'flex';
+    if (adminDashboard) adminDashboard.style.display = 'none';
     // Clear any running timers
     clearTimeout(sessionTimer);
     clearTimeout(warningTimer);
@@ -199,9 +202,11 @@ function showLogin() {
 }
 
 function showDashboard() {
-    loginScreen.style.display = 'none';
-    adminDashboard.style.display = 'flex';
+    document.documentElement.classList.add('user-authenticated');
+    if (loginScreen) loginScreen.style.display = 'none';
+    if (adminDashboard) adminDashboard.style.display = 'flex';
     fetchOrders();
+    fetchCategoriesAdmin();
     fetchSettings();
     resetSessionTimer();   // Start the 10-minute idle timer
 }
@@ -222,6 +227,8 @@ loginForm.addEventListener('submit', async (e) => {
         if (res.ok && data.role === 'admin') {
             authToken = data.token;
             localStorage.setItem('adminToken', authToken);
+            localStorage.setItem('authToken', authToken);
+            if (loginError) loginError.textContent = '';
             showDashboard();
         } else {
             loginError.textContent = data.error || 'غير مصرح لك بالدخول';
@@ -236,18 +243,48 @@ logoutBtn.addEventListener('click', () => {
 });
 
 // --- Navigation ---
-navBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-        navBtns.forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        
-        sections.forEach(sec => sec.style.display = 'none');
-        document.getElementById(btn.dataset.target).style.display = 'block';
-        
-        // Refresh data based on view
-        if (btn.dataset.target === 'ordersView') fetchOrders();
-        if (btn.dataset.target === 'productsView') fetchProductsAdmin();
-        if (btn.dataset.target === 'settingsView') fetchSettings();
+document.addEventListener('DOMContentLoaded', () => {
+    const navButtons = document.querySelectorAll('.admin-nav-btn');
+    
+    navButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const targetId = btn.getAttribute('data-target');
+            if (!targetId) return;
+
+            // Highlight active button
+            navButtons.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+
+            // Hide all admin sections
+            const allSections = document.querySelectorAll('.admin-section');
+            allSections.forEach(sec => sec.style.display = 'none');
+
+            // Show selected section
+            const targetSection = document.getElementById(targetId);
+            if (targetSection) {
+                targetSection.style.display = 'block';
+            }
+
+            // Refresh data safely
+            try {
+                if (targetId === 'ordersView' && typeof fetchOrders === 'function') fetchOrders();
+                if (targetId === 'productsView' && typeof fetchProductsAdmin === 'function') fetchProductsAdmin();
+                if (targetId === 'categoriesView' && typeof fetchCategoriesAdmin === 'function') fetchCategoriesAdmin();
+                if (targetId === 'commentsAdminView' && typeof fetchCommentsAdmin === 'function') fetchCommentsAdmin();
+                if (targetId === 'settingsView' && typeof fetchSettings === 'function') fetchSettings();
+            } catch (err) {
+                console.error('Navigation fetch error:', err);
+            }
+        });
+    });
+
+    // Global ESC Key Handler for Admin Modals
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' || e.keyCode === 27) {
+            if (typeof closeOrderModal === 'function') closeOrderModal();
+            if (typeof closeProductModal === 'function') closeProductModal();
+            if (typeof closeCategoryFormCard === 'function') closeCategoryFormCard();
+        }
     });
 });
 
@@ -313,6 +350,8 @@ async function fetchSettings() {
         if (data.cash_on_delivery_enabled)
             document.getElementById('setCod').checked = (data.cash_on_delivery_enabled === 'true');
 
+
+
         // Announcement fields
         const annEnabled = document.getElementById('setAnnouncementEnabled');
         if (annEnabled && data.announcement_enabled !== undefined) {
@@ -335,6 +374,58 @@ async function fetchSettings() {
                 addAnnouncementRow('');
             } else {
                 texts.forEach(t => addAnnouncementRow(t));
+            }
+        }
+
+        // Theme Color & Mode fields
+        if (data.theme_color) {
+            updateThemeColorInput(data.theme_color);
+            applyThemeColor(data.theme_color);
+        }
+        if (data.theme_mode) {
+            localStorage.setItem('theme_mode', data.theme_mode);
+            applyThemeMode(data.theme_mode);
+            const radio = document.querySelector(`input[name="themeModeRadio"][value="${data.theme_mode}"]`);
+            if (radio) radio.checked = true;
+        }
+
+        // Hero Slider fields
+        if (data.hero_slides) {
+            try {
+                const slides = JSON.parse(data.hero_slides);
+                if (slides[0]) {
+                    if (document.getElementById('heroImgUrl1')) document.getElementById('heroImgUrl1').value = slides[0].image || '';
+                    if (document.getElementById('heroPreview1')) document.getElementById('heroPreview1').src = slides[0].image || './assets/images/hero_slide_1.jpg';
+                    if (document.getElementById('heroTitle1')) document.getElementById('heroTitle1').value = slides[0].title || '';
+                    if (document.getElementById('heroSubtitle1')) document.getElementById('heroSubtitle1').value = slides[0].subtitle || '';
+                    if (document.getElementById('heroDesc1')) document.getElementById('heroDesc1').value = slides[0].description || '';
+                }
+                if (slides[1]) {
+                    if (document.getElementById('heroImgUrl2')) document.getElementById('heroImgUrl2').value = slides[1].image || '';
+                    if (document.getElementById('heroPreview2')) document.getElementById('heroPreview2').src = slides[1].image || './assets/images/hero_slide_2.jpg';
+                    if (document.getElementById('heroTitle2')) document.getElementById('heroTitle2').value = slides[1].title || '';
+                    if (document.getElementById('heroSubtitle2')) document.getElementById('heroSubtitle2').value = slides[1].subtitle || '';
+                    if (document.getElementById('heroDesc2')) document.getElementById('heroDesc2').value = slides[1].description || '';
+                }
+            } catch(e) {}
+        }
+
+        // Store Features fields
+        const featContainer = document.getElementById('featureRowsContainer');
+        if (featContainer) {
+            featContainer.innerHTML = '';
+            let features = [];
+            if (data.store_features) {
+                try {
+                    features = JSON.parse(data.store_features);
+                } catch(e) {}
+            }
+            if (!Array.isArray(features) || features.length === 0) {
+                addFeatureRow('شحن سريع ومجاني', 'شحن خلال 24-48 ساعة لجميع المحافظات', 'fa-truck-fast');
+                addFeatureRow('استرجاع واستبدال مرن', 'خلال 14 يوماً بكل سهولة وسلاسة', 'fa-rotate-left');
+                addFeatureRow('جودة مضمونة 100%', 'منتجات أصلية من خامات طبيعية ممتازة', 'fa-shield-halved');
+            } else {
+                features.forEach(f => addFeatureRow(f.title, f.desc, f.icon));
             }
         }
     } catch(err) { console.error(err); }
@@ -1112,3 +1203,659 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 });
+
+// ─── Categories Management (Admin) ───────────────────────────────────────────
+let adminCategories = [];
+
+async function fetchCategoriesAdmin() {
+    try {
+        const res = await fetch(`${API_URL}/categories`);
+        const data = await res.json();
+        adminCategories = Array.isArray(data) ? data : [];
+        renderCategoriesAdmin();
+        populateProductCategorySelect();
+    } catch (err) {
+        console.error('fetchCategoriesAdmin error:', err);
+    }
+}
+
+function renderCategoriesAdmin() {
+    const tbody = document.getElementById('adminCategoriesTableBody') || document.getElementById('categoriesTableBody');
+    const mobileGrid = document.getElementById('adminCategoriesMobileGrid');
+
+    if (adminCategories.length === 0) {
+        if (tbody) tbody.innerHTML = `<tr><td colspan="5" class="text-center" style="padding:20px; color:var(--color-text-muted);">لا توجد فئات حالياً. اضغط "إضافة فئة جديدة" للبدء.</td></tr>`;
+        if (mobileGrid) mobileGrid.innerHTML = `<div class="text-center" style="padding:25px; color:var(--color-text-muted);">لا توجد فئات حالياً. اضغط "إضافة فئة جديدة" للبدء.</div>`;
+        return;
+    }
+
+    if (tbody) {
+        tbody.innerHTML = adminCategories.map(c => {
+            const imgPath = c.image || `./assets/images/cat_${c.key}.jpg`;
+            return `
+            <tr>
+                <td style="width: 70px;">
+                    <img src="${imgPath}" alt="${c.name}" style="width:55px; height:42px; object-fit:cover; border-radius:8px; border:1px solid var(--color-border);" onerror="this.src='./assets/images/cat_clothing.jpg'">
+                </td>
+                <td><strong style="color: var(--color-text-primary); font-size: 0.92rem;">${c.name}</strong></td>
+                <td><span class="status-badge" style="background: rgba(212, 175, 55, 0.12); color: var(--color-gold); border: 1px solid rgba(212, 175, 55, 0.25); font-family: monospace;">${c.key}</span></td>
+                <td><i class="fa-solid ${c.icon || 'fa-tag'}" style="color:var(--color-gold); font-size:1.05rem;"></i> <small style="color:var(--color-text-muted);">(${c.icon || 'fa-tag'})</small></td>
+                <td style="white-space: nowrap; width: 140px;">
+                    <button class="btn btn-outline" style="padding:4px 10px; font-size:0.8rem; margin-left:4px;" onclick="editCategory(${c.id})"><i class="fa-solid fa-pen"></i> تعديل</button>
+                    <button class="btn btn-outline" style="padding:4px 10px; font-size:0.8rem; color:var(--color-danger); border-color:rgba(239,68,68,0.3);" onclick="deleteCategory(${c.id})"><i class="fa-solid fa-trash"></i> حذف</button>
+                </td>
+            </tr>
+        `;
+        }).join('');
+    }
+
+    if (mobileGrid) {
+        mobileGrid.innerHTML = adminCategories.map(c => {
+            const imgPath = c.image || `./assets/images/cat_${c.key}.jpg`;
+            return `
+            <div class="category-admin-card">
+                <div class="category-admin-card-header">
+                    <img src="${imgPath}" alt="${c.name}" class="category-admin-card-img" onerror="this.src='./assets/images/cat_clothing.jpg'">
+                    <div class="category-admin-card-info">
+                        <h4>${c.name}</h4>
+                        <div class="category-admin-card-tags">
+                            <span class="status-badge" style="background: rgba(212, 175, 55, 0.12); color: var(--color-gold); border: 1px solid rgba(212, 175, 55, 0.25); font-family: monospace; font-size:0.75rem;">${c.key}</span>
+                            <span style="font-size:0.8rem; color:var(--color-text-muted);"><i class="fa-solid ${c.icon || 'fa-tag'}" style="color:var(--color-gold);"></i> ${c.icon || 'fa-tag'}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="category-admin-card-actions">
+                    <button class="btn btn-outline" style="padding:7px 12px; font-size:0.83rem;" onclick="editCategory(${c.id})"><i class="fa-solid fa-pen"></i> تعديل</button>
+                    <button class="btn btn-outline" style="padding:7px 12px; font-size:0.83rem; color:var(--color-danger); border-color:rgba(239,68,68,0.3);" onclick="deleteCategory(${c.id})"><i class="fa-solid fa-trash"></i> حذف</button>
+                </div>
+            </div>
+        `;
+        }).join('');
+    }
+}
+
+function populateProductCategorySelect() {
+    const select = document.getElementById('prodCategory');
+    if (!select) return;
+    const currentVal = select.value;
+    if (adminCategories.length > 0) {
+        select.innerHTML = adminCategories.map(c => `
+            <option value="${c.key}">${c.name} (${c.key})</option>
+        `).join('');
+        if (currentVal && adminCategories.some(c => c.key === currentVal)) {
+            select.value = currentVal;
+        }
+    }
+}
+
+function handleCatKeySelectChange(val) {
+    const select = document.getElementById('catKeySelect');
+    const customInput = document.getElementById('catKeyCustom');
+    const hiddenKey = document.getElementById('catKey');
+    const nameInput = document.getElementById('catName');
+    const iconInput = document.getElementById('catIcon');
+
+    if (val === 'custom') {
+        if (customInput) customInput.style.display = 'block';
+        if (customInput) customInput.focus();
+        if (hiddenKey) hiddenKey.value = customInput ? customInput.value.trim() : '';
+    } else {
+        if (customInput) customInput.style.display = 'none';
+        if (hiddenKey) hiddenKey.value = val;
+
+        if (select && select.selectedIndex >= 0 && val) {
+            const selectedOpt = select.options[select.selectedIndex];
+            const autoName = selectedOpt.getAttribute('data-name');
+            const autoIcon = selectedOpt.getAttribute('data-icon');
+            if (autoName && nameInput && (!nameInput.value || nameInput.getAttribute('data-autofilled') === 'true')) {
+                nameInput.value = autoName;
+                nameInput.setAttribute('data-autofilled', 'true');
+            }
+            if (autoIcon && iconInput) {
+                iconInput.value = autoIcon;
+            }
+        }
+    }
+}
+
+function syncCustomCatKey(val) {
+    const hiddenKey = document.getElementById('catKey');
+    if (hiddenKey) hiddenKey.value = val.trim().toLowerCase().replace(/\s+/g, '-');
+}
+
+function openAddCategoryForm() {
+    const card = document.getElementById('categoryFormCard');
+    if (!card) return;
+    const form = document.getElementById('categoryAdminForm');
+    if (form) form.reset();
+    document.getElementById('catEditId').value = '';
+
+    const select = document.getElementById('catKeySelect');
+    const customInput = document.getElementById('catKeyCustom');
+    const hiddenKey = document.getElementById('catKey');
+    const nameInput = document.getElementById('catName');
+
+    if (select) {
+        select.value = '';
+        select.disabled = false;
+    }
+    if (customInput) customInput.style.display = 'none';
+    if (hiddenKey) hiddenKey.value = '';
+    if (nameInput) nameInput.removeAttribute('data-autofilled');
+
+    document.getElementById('categoryFormTitle').textContent = 'إضافة فئة جديدة (سكشن اختر فئتك المفضلة)';
+    document.getElementById('catPreviewBox').style.display = 'none';
+    const feedback = document.getElementById('catFeedback');
+    if (feedback) feedback.textContent = '';
+    card.style.display = 'block';
+    card.scrollIntoView({ behavior: 'smooth' });
+}
+
+function closeCategoryFormCard() {
+    const card = document.getElementById('categoryFormCard');
+    if (card) card.style.display = 'none';
+}
+
+function previewCatImage(input) {
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            document.getElementById('catPreviewImg').src = e.target.result;
+            document.getElementById('catPreviewBox').style.display = 'block';
+        };
+        reader.readAsDataURL(input.files[0]);
+    }
+}
+
+function editCategory(id) {
+    const c = adminCategories.find(x => x.id === id);
+    if (!c) return;
+    openAddCategoryForm();
+    document.getElementById('catEditId').value = c.id;
+
+    const select = document.getElementById('catKeySelect');
+    const customInput = document.getElementById('catKeyCustom');
+    const hiddenKey = document.getElementById('catKey');
+
+    if (hiddenKey) hiddenKey.value = c.key;
+
+    const existsInSelect = select ? [...select.options].some(opt => opt.value === c.key) : false;
+    if (existsInSelect && select) {
+        select.value = c.key;
+        if (customInput) customInput.style.display = 'none';
+    } else {
+        if (select) select.value = 'custom';
+        if (customInput) {
+            customInput.value = c.key;
+            customInput.style.display = 'block';
+        }
+    }
+    if (select) select.disabled = true;
+
+    document.getElementById('catName').value = c.name;
+    document.getElementById('catIcon').value = c.icon || 'fa-tag';
+    document.getElementById('catImageUrl').value = c.image || '';
+    if (c.image) {
+        document.getElementById('catPreviewImg').src = c.image;
+        document.getElementById('catPreviewBox').style.display = 'block';
+    }
+    document.getElementById('categoryFormTitle').textContent = `تعديل فئة: ${c.name}`;
+}
+
+async function handleCategoryFormSubmit(e) {
+    e.preventDefault();
+    const feedback = document.getElementById('catFeedback');
+    if (feedback) feedback.textContent = 'جاري الحفظ...';
+
+    const id = document.getElementById('catEditId').value;
+    const key = document.getElementById('catKey').value.trim();
+    const name = document.getElementById('catName').value.trim();
+    const icon = document.getElementById('catIcon').value.trim();
+    const imageUrl = document.getElementById('catImageUrl').value.trim();
+    const fileInput = document.getElementById('catImageFile');
+
+    const formData = new FormData();
+    formData.append('key', key);
+    formData.append('name', name);
+    formData.append('icon', icon);
+    if (imageUrl) formData.append('image', imageUrl);
+    if (fileInput && fileInput.files[0]) {
+        formData.append('categoryImageFile', fileInput.files[0]);
+    }
+
+    const url = id ? `${API_URL}/categories/${id}` : `${API_URL}/categories`;
+    const method = id ? 'PUT' : 'POST';
+
+    try {
+        const res = await fetch(url, {
+            method,
+            headers: { 'Authorization': `Bearer ${authToken}` },
+            body: formData
+        });
+        const data = await res.json();
+
+        if (res.ok) {
+            if (feedback) {
+                feedback.style.color = '#10B981';
+                feedback.textContent = 'تم حفظ الفئة بنجاح!';
+            }
+            setTimeout(() => {
+                closeCategoryFormCard();
+                fetchCategoriesAdmin();
+            }, 800);
+        } else {
+            if (feedback) {
+                feedback.style.color = '#EF4444';
+                feedback.textContent = data.error || 'فشل حفظ الفئة';
+            }
+        }
+    } catch (err) {
+        console.error('handleCategoryFormSubmit error:', err);
+        if (feedback) {
+            feedback.style.color = '#EF4444';
+            feedback.textContent = 'حدث خطأ أثناء الاتصال بالسيرفر';
+        }
+    }
+}
+
+async function deleteCategory(id) {
+    if (!confirm('هل أنت متأكد من حذف هذه الفئة؟ سيتم حذفها أيضاً من سكشن الفئات في المتجر.')) return;
+    try {
+        const res = await fetch(`${API_URL}/categories/${id}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        if (res.ok) {
+            fetchCategoriesAdmin();
+        } else {
+            const data = await res.json();
+            alert(data.error || 'فشل حذف الفئة');
+        }
+    } catch (err) {
+        console.error(err);
+    }
+}
+
+
+// ─── Theme Color Controls (Admin) ───────────────────────────────────────────
+function selectThemePreset(hex) {
+    updateThemeColorInput(hex);
+    applyThemeColor(hex);
+}
+
+function updateThemeColorInput(hex) {
+    if (!hex) return;
+    const native = document.getElementById('themeColorNative');
+    const text   = document.getElementById('themeColorHex');
+    const prev   = document.getElementById('themeColorPreview');
+    if (native) native.value = hex;
+    if (text) text.value = hex.toUpperCase();
+    if (prev) prev.style.background = hex;
+    applyThemeColor(hex);
+}
+
+function applyThemeColor(color) {
+    if (!color || typeof color !== 'string') return;
+    const root = document.documentElement;
+    root.style.setProperty('--color-gold', color);
+    
+    let hex = color.replace('#', '');
+    if (hex.length === 3) hex = hex.split('').map(c => c + c).join('');
+    if (hex.length === 6) {
+        const r = parseInt(hex.substring(0, 2), 16);
+        const g = parseInt(hex.substring(2, 4), 16);
+        const b = parseInt(hex.substring(4, 6), 16);
+        root.style.setProperty('--color-gold-light', `rgba(${r}, ${g}, ${b}, 0.15)`);
+        root.style.setProperty('--color-border-focus', `rgba(${r}, ${g}, ${b}, 0.5)`);
+        root.style.setProperty('--shadow-gold', `0 4px 20px rgba(${r}, ${g}, ${b}, 0.15)`);
+    }
+}
+
+async function saveThemeColorSettings() {
+    let hex = document.getElementById('themeColorHex')?.value.trim();
+    const feedback = document.getElementById('themeColorFeedback');
+    if (!hex || !/^#[0-9A-F]{6}$/i.test(hex)) {
+        hex = '#D4AF37';
+    }
+    const modeRadio = document.querySelector('input[name="themeModeRadio"]:checked');
+    const themeMode = modeRadio ? modeRadio.value : 'dark';
+
+    try {
+        const res = await fetch(`${API_URL}/settings`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify({ theme_color: hex, theme_mode: themeMode })
+        });
+        if (res.ok) {
+            if (feedback) {
+                feedback.className = 'feedback-msg success';
+                feedback.textContent = '✅ تم حفظ مظهر ونمط الألوان بنجاح!';
+            }
+            applyThemeColor(hex);
+            localStorage.setItem('theme_mode', themeMode);
+            applyThemeMode(themeMode);
+        } else {
+            const data = await res.json();
+            if (feedback) {
+                feedback.className = 'feedback-msg error';
+                feedback.textContent = data.error || 'حدث خطأ أثناء الحفظ.';
+            }
+        }
+    } catch (err) {
+        console.error(err);
+    }
+}
+
+function applyThemeMode(mode) {
+    if (mode === 'light') {
+        document.documentElement.setAttribute('data-theme', 'light');
+        document.body.setAttribute('data-theme', 'light');
+        document.body.classList.add('light-mode');
+    } else {
+        document.documentElement.removeAttribute('data-theme');
+        document.body.removeAttribute('data-theme');
+        document.body.classList.remove('light-mode');
+    }
+}
+
+function previewThemeMode(mode) {
+    applyThemeMode(mode);
+}
+
+
+// ─── Hero Background Slider Controls (Admin) ─────────────────────────────────
+async function uploadHeroImageFile(slideNum) {
+    const fileInput = document.getElementById(`heroFile${slideNum}`);
+    if (!fileInput || !fileInput.files || fileInput.files.length === 0) return;
+
+    const formData = new FormData();
+    formData.append('heroImage', fileInput.files[0]);
+
+    try {
+        const res = await fetch(`${API_URL}/upload-hero-image`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${authToken}` },
+            body: formData
+        });
+        const data = await res.json();
+        if (res.ok && data.imageUrl) {
+            document.getElementById(`heroImgUrl${slideNum}`).value = data.imageUrl;
+            document.getElementById(`heroPreview${slideNum}`).src = data.imageUrl;
+        } else {
+            alert(data.error || 'فشل رفع صورة الهيرو');
+        }
+    } catch (err) {
+        console.error(err);
+        alert('خطأ في الاتصال بالخادم أثناء رفع الصورة.');
+    }
+}
+
+async function saveHeroSliderSettings() {
+    const feedback = document.getElementById('heroSliderFeedback');
+    
+    const slide1 = {
+        image:       document.getElementById('heroImgUrl1')?.value.trim() || './assets/images/hero_slide_1.jpg',
+        title:       document.getElementById('heroTitle1')?.value.trim() || '',
+        subtitle:    document.getElementById('heroSubtitle1')?.value.trim() || '',
+        description: document.getElementById('heroDesc1')?.value.trim() || ''
+    };
+    
+    const slide2 = {
+        image:       document.getElementById('heroImgUrl2')?.value.trim() || './assets/images/hero_slide_2.jpg',
+        title:       document.getElementById('heroTitle2')?.value.trim() || '',
+        subtitle:    document.getElementById('heroSubtitle2')?.value.trim() || '',
+        description: document.getElementById('heroDesc2')?.value.trim() || ''
+    };
+
+    const hero_slides = JSON.stringify([slide1, slide2]);
+
+    try {
+        const res = await fetch(`${API_URL}/settings`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify({ hero_slides })
+        });
+        if (res.ok) {
+            if (feedback) {
+                feedback.className = 'feedback-msg success';
+                feedback.textContent = '✅ تم حفظ صور وإعدادات الواجهة بنجاح!';
+            }
+        } else {
+            const data = await res.json();
+            if (feedback) {
+                feedback.className = 'feedback-msg error';
+                feedback.textContent = data.error || 'حدث خطأ أثناء الحفظ.';
+            }
+        }
+    } catch (err) {
+        console.error(err);
+    }
+}
+
+// ─── Store Features (Quick Stats) Controls (Admin) ────────────────────────────
+function addFeatureRow(title = '', desc = '', icon = 'fa-star') {
+    const container = document.getElementById('featureRowsContainer');
+    if (!container) return;
+    const row = document.createElement('div');
+    row.className = 'feature-admin-row';
+    row.style.background = 'var(--color-bg-tertiary)';
+    row.style.border = '1px solid var(--color-border)';
+    row.style.borderRadius = 'var(--radius-md)';
+    row.style.padding = '14px';
+    row.style.display = 'flex';
+    row.style.flexDirection = 'column';
+    row.style.gap = '10px';
+    
+    row.innerHTML = `
+        <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
+            <select class="feature-icon-input form-control" style="flex:1 1 140px; min-width:130px; background:var(--color-bg-secondary); border:1px solid var(--color-border); padding:8px 10px; color:#fff; border-radius:var(--radius-sm); font-size:0.85rem;">
+                <option value="fa-truck-fast" ${icon === 'fa-truck-fast' ? 'selected' : ''}>🚚 fa-truck-fast (شحن)</option>
+                <option value="fa-rotate-left" ${icon === 'fa-rotate-left' ? 'selected' : ''}>🔄 fa-rotate-left (استرجاع)</option>
+                <option value="fa-shield-halved" ${icon === 'fa-shield-halved' ? 'selected' : ''}>🛡️ fa-shield-halved (جودة/ضمان)</option>
+                <option value="fa-headset" ${icon === 'fa-headset' ? 'selected' : ''}>🎧 fa-headset (دعم فني)</option>
+                <option value="fa-gem" ${icon === 'fa-gem' ? 'selected' : ''}>💎 fa-gem (فخامة/تميز)</option>
+                <option value="fa-box" ${icon === 'fa-box' ? 'selected' : ''}>📦 fa-box (تغليف فاخر)</option>
+                <option value="fa-hand-holding-dollar" ${icon === 'fa-hand-holding-dollar' ? 'selected' : ''}>💵 fa-hand-holding-dollar (دفع)</option>
+                <option value="fa-star" ${icon === 'fa-star' ? 'selected' : ''}>⭐ fa-star (نجمة)</option>
+            </select>
+            <input type="text" class="feature-title-input form-control" style="flex:2 1 180px; min-width:150px; background:var(--color-bg-secondary); border:1px solid var(--color-border); padding:8px 12px; color:#fff; border-radius:var(--radius-sm); font-size:0.88rem;" placeholder="العنوان الرئيسي (مثال: شحن سريع ومجاني)" value="${title.replace(/"/g, '&quot;')}">
+            <button type="button" class="btn btn-outline" style="color:var(--color-danger); border-color:rgba(239,68,68,0.4); padding:8px 12px; border-radius:var(--radius-sm); flex-shrink:0;" onclick="this.parentElement.parentElement.remove()" title="حذف">
+                <i class="fa-solid fa-trash"></i>
+            </button>
+        </div>
+        <div>
+            <input type="text" class="feature-desc-input form-control" style="width:100%; background:var(--color-bg-secondary); border:1px solid var(--color-border); padding:8px 12px; color:var(--color-text-secondary); border-radius:var(--radius-sm); font-size:0.88rem;" placeholder="الوصف (مثال: شحن خلال 24-48 ساعة لجميع المحافظات)" value="${desc.replace(/"/g, '&quot;')}">
+        </div>
+    `;
+    container.appendChild(row);
+}
+window.addFeatureRow = addFeatureRow;
+
+async function saveStoreFeaturesSettings() {
+    const feedback = document.getElementById('featuresFeedback');
+    const container = document.getElementById('featureRowsContainer');
+    if (!container) return;
+
+    const rows = container.querySelectorAll('.feature-admin-row');
+    const featuresList = [];
+
+    rows.forEach(r => {
+        const icon = r.querySelector('.feature-icon-input')?.value || 'fa-star';
+        const title = r.querySelector('.feature-title-input')?.value.trim();
+        const desc = r.querySelector('.feature-desc-input')?.value.trim();
+        if (title) {
+            featuresList.push({ icon, title, desc: desc || '' });
+        }
+    });
+
+    const store_features = JSON.stringify(featuresList);
+
+    try {
+        const res = await fetch(`${API_URL}/settings`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify({ store_features })
+        });
+        if (res.ok) {
+            if (feedback) {
+                feedback.className = 'feedback-msg success';
+                feedback.textContent = '✅ تم حفظ مميزات المتجر بنجاح!';
+            }
+        } else {
+            const data = await res.json();
+            if (feedback) {
+                feedback.className = 'feedback-msg error';
+                feedback.textContent = data.error || 'حدث خطأ أثناء الحفظ.';
+            }
+        }
+    } catch (err) {
+        console.error(err);
+    }
+}
+window.saveStoreFeaturesSettings = saveStoreFeaturesSettings;
+
+// ─── Comments Management (Admin) ──────────────────────────────────────────
+let adminCommentsList = [];
+
+async function fetchCommentsAdmin() {
+    try {
+        const res = await fetch(`${API_URL}/admin/reviews`, {
+            headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        if (res.status === 401 || res.status === 403) {
+            forceLogout();
+            return;
+        }
+        const data = await res.json();
+        adminCommentsList = Array.isArray(data) ? data : [];
+        renderCommentsAdmin();
+    } catch (err) {
+        console.error('fetchCommentsAdmin error:', err);
+    }
+
+    try {
+        const setRes = await fetch(`${API_URL}/settings`);
+        if (setRes.ok) {
+            const settings = await setRes.json();
+            const toggle = document.getElementById('toggleCommentsVisibility');
+            if (toggle) {
+                toggle.checked = (settings.reviews_enabled !== 'false' && settings.reviews_enabled !== false);
+            }
+        }
+    } catch (e) {}
+}
+
+function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+function renderCommentsAdmin() {
+    const tbody = document.getElementById('adminCommentsTableBody');
+    if (!tbody) return;
+
+    if (adminCommentsList.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="text-center" style="padding: 25px; color: var(--color-text-muted);">لا توجد تعليقات حالياً.</td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = adminCommentsList.map(c => {
+        const stars = '⭐'.repeat(Math.round(c.rating || 5));
+        return `
+            <tr>
+                <td><strong>${escapeHtml(c.name || 'عميل')}</strong></td>
+                <td><span style="color:var(--color-gold); font-size:0.9rem;">${stars} (${c.rating})</span></td>
+                <td style="max-width:350px; font-size:0.88rem; color:var(--color-text-secondary); line-height:1.5;">"${escapeHtml(c.comment)}"</td>
+                <td><small style="color:var(--color-text-muted);">${escapeHtml(c.dateText || 'الآن')}</small></td>
+                <td>
+                    <button class="btn btn-outline" style="padding:6px 12px; font-size:0.82rem; color:var(--color-danger); border-color:rgba(239,68,68,0.3);" onclick="deleteCommentAdmin(${c.id})">
+                        <i class="fa-solid fa-trash"></i> حذف التعليق
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+async function deleteCommentAdmin(id) {
+    if (!confirm('هل أنت متأكد من حذف هذا التعليق؟')) return;
+    try {
+        const res = await fetch(`${API_URL}/admin/reviews/${id}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        if (res.ok) {
+            fetchCommentsAdmin();
+        } else {
+            const data = await res.json();
+            alert(data.error || 'فشل حذف التعليق');
+        }
+    } catch (err) {
+        console.error(err);
+        alert('خطأ في الاتصال بالخادم.');
+    }
+}
+window.deleteCommentAdmin = deleteCommentAdmin;
+
+async function saveCommentsVisibilitySettings() {
+    const toggle = document.getElementById('toggleCommentsVisibility');
+    const feedback = document.getElementById('commentsVisibilityFeedback');
+    if (!toggle) return;
+
+    const reviews_enabled = toggle.checked ? 'true' : 'false';
+
+    if (feedback) {
+        feedback.className = 'feedback-msg';
+        feedback.style.color = 'var(--color-gold)';
+        feedback.textContent = 'جاري الحفظ...';
+    }
+
+    try {
+        const res = await fetch(`${API_URL}/settings`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify({ reviews_enabled })
+        });
+        if (res.ok) {
+            if (feedback) {
+                feedback.className = 'feedback-msg success';
+                feedback.textContent = '✅ تم تحديث حالة إظهار التعليقات في المتجر!';
+                setTimeout(() => { if (feedback) feedback.textContent = ''; }, 3000);
+            }
+        } else {
+            const data = await res.json();
+            if (feedback) {
+                feedback.className = 'feedback-msg error';
+                feedback.textContent = data.error || 'فشل الحفظ.';
+            }
+        }
+    } catch (err) {
+        console.error(err);
+        if (feedback) {
+            feedback.className = 'feedback-msg error';
+            feedback.textContent = 'خطأ في الاتصال بالخادم.';
+        }
+    }
+}
+window.saveCommentsVisibilitySettings = saveCommentsVisibilitySettings;
+
+
+
+

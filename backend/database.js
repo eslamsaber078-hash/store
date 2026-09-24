@@ -199,15 +199,22 @@ function initDb() {
         role TEXT DEFAULT 'user'
     )`, (err) => {
         if (err) return;
-        const adminUsername = 'eslam.bk';
-        const adminPassword = '01190622530';
+        db.run("ALTER TABLE users ADD COLUMN name TEXT", () => {});
+        db.run("ALTER TABLE users ADD COLUMN picture TEXT", () => {});
+        db.run("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user'", () => {});
+
+        const adminUsername = process.env.ADMIN_USERNAME || 'eslam.bk';
+        const adminPassword = process.env.ADMIN_PASSWORD || '01190622530';
+        if (!process.env.ADMIN_USERNAME || !process.env.ADMIN_PASSWORD) {
+            console.warn('[SECURITY] ADMIN_USERNAME or ADMIN_PASSWORD not set in env — using default credentials. Change them in .env or Render env vars!');
+        }
         db.get("SELECT id FROM users WHERE username = ?", [adminUsername], (err, row) => {
             if (row) return;
             const hash = bcrypt.hashSync(adminPassword, 10);
             db.run(
-                "INSERT INTO users (username, password, name, role) VALUES (?, ?, 'Eslam Admin', 'admin')",
+                "INSERT INTO users (username, password, name, role) VALUES (?, ?, 'Admin', 'admin')",
                 [adminUsername, hash],
-                (err) => { if (!err) console.log("[DB] Admin account seeded: eslam.bk / 01190622530"); }
+                (err) => { if (!err) console.log("[DB] Admin account seeded successfully."); }
             );
         });
     });
@@ -255,7 +262,14 @@ function initDb() {
         payment_sender TEXT,
         payment_reference TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`);
+    )`, (err) => {
+        if (err) return;
+        db.run("ALTER TABLE orders ADD COLUMN subtotal REAL", () => {});
+        db.run("ALTER TABLE orders ADD COLUMN discount REAL", () => {});
+        db.run("ALTER TABLE orders ADD COLUMN payment_sender TEXT", () => {});
+        db.run("ALTER TABLE orders ADD COLUMN payment_reference TEXT", () => {});
+        db.run("ALTER TABLE orders ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP", () => {});
+    });
 
     // 4. order_items
     db.run(`CREATE TABLE IF NOT EXISTS order_items (
@@ -268,26 +282,118 @@ function initDb() {
         color TEXT
     )`);
 
-    // 5. settings
+    // 5. categories
+    db.run(`CREATE TABLE IF NOT EXISTS categories (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        key TEXT UNIQUE,
+        name TEXT,
+        icon TEXT DEFAULT 'fa-tag',
+        image TEXT
+    )`, (err) => {
+        if (err) return;
+        db.run("ALTER TABLE categories ADD COLUMN image TEXT", () => {});
+        db.get("SELECT COUNT(*) as count FROM categories", [], (err, row) => {
+            if (!row || row.count !== 0) return;
+            const defaultCats = [
+                { key: 'clothing',    name: 'الملابس الإيطالية الراقية', icon: 'fa-shirt',       image: './assets/images/cat_clothing.jpg' },
+                { key: 'shoes',       name: 'أفخم الأحذية المصنوعة يدوياً', icon: 'fa-shoe-prints',  image: './assets/images/cat_shoes.jpg' },
+                { key: 'pants',       name: 'بناطيل وتصميمات عصرية',       icon: 'fa-user-ninja',   image: './assets/images/cat_pants.jpg' },
+                { key: 'accessories', name: 'ساعات وإكسسوارات النخبة',   icon: 'fa-gem',          image: './assets/images/cat_accessories.jpg' }
+            ];
+            const stmt = db.prepare("INSERT INTO categories (key, name, icon, image) VALUES (?, ?, ?, ?)");
+            defaultCats.forEach(c => stmt.run(c.key, c.name, c.icon, c.image));
+            stmt.finalize();
+            console.log("[DB] Default categories seeded.");
+        });
+    });
+
+    // 6. settings
     db.run(`CREATE TABLE IF NOT EXISTS settings (
         key TEXT PRIMARY KEY,
         value TEXT
     )`, (err) => {
         if (err) return;
-        db.get("SELECT COUNT(*) as count FROM settings", [], (err, row) => {
+        const defaultSettings = [
+            { key: 'bank_account',             value: 'EG12345678901234567890 (البنك الأهلي)' },
+            { key: 'instapay',                  value: 'eslam.bk@instapay' },
+            { key: 'ewallets',                  value: '01190622530 (فودافون كاش)' },
+            { key: 'cash_on_delivery_enabled',  value: 'true' },
+            { key: 'reviews_enabled',           value: 'true' },
+            { key: 'announcement_text',         value: '["🚚 شحن مجاني للطلبات أكثر من 3,000 ج.م", "🏷️ استخدم كود DAVINCI10 للحصول على خصم 10%"]' },
+            { key: 'announcement_enabled',      value: 'true' },
+            { key: 'theme_color',               value: '#D4AF37' },
+            { key: 'theme_mode',                value: 'dark' },
+            { key: 'hero_slides',               value: JSON.stringify([
+                {
+                    image: './assets/images/suit.png',
+                    title: 'تشكيلة الخريف والشتاء الحصرية 2026',
+                    subtitle: 'أناقة بلا حدود | DA VINCI STORE',
+                    description: 'استمتع بأفخم التصميمات الحصرية والمنتجات المصنوعة يدوياً بأعلى معايير الجودة الإيطالية.'
+                },
+                {
+                    image: './assets/images/shoes.jpg',
+                    title: 'أفخم الأحذية المصنوعة يدوياً 2026',
+                    subtitle: 'جلد طبيعي 100% | جودة وتصميم إيطالي',
+                    description: 'مجموعة فاخرة ومريحة من أحذية الجلد الطبيعي المصنوعة بدقة عالية لتناسب ذوقك الرفيع.'
+                }
+            ]) },
+            { key: 'store_features',            value: JSON.stringify([
+                { icon: 'fa-truck-fast', title: 'شحن سريع ومجاني', desc: 'شحن خلال 24-48 ساعة لجميع المحافظات' },
+                { icon: 'fa-rotate-left', title: 'استرجاع واستبدال مرن', desc: 'خلال 14 يوماً بكل سهولة وسلاسة' },
+                { icon: 'fa-shield-halved', title: 'جودة مضمونة 100%', desc: 'منتجات أصلية من خامات طبيعية ممتازة' }
+            ]) }
+        ];
+
+        defaultSettings.forEach(s => {
+            db.get("SELECT key FROM settings WHERE key = ?", [s.key], (err, row) => {
+                if (!err && !row) {
+                    db.run("INSERT INTO settings (key, value) VALUES (?, ?)", [s.key, s.value]);
+                }
+            });
+        });
+    });
+
+    // 7. reviews
+    db.run(`CREATE TABLE IF NOT EXISTS reviews (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT,
+        rating REAL DEFAULT 5,
+        comment TEXT,
+        date_text TEXT,
+        verified INTEGER DEFAULT 1,
+        status TEXT DEFAULT 'approved',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`, (err) => {
+        if (err) return;
+        db.run("ALTER TABLE reviews ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP", () => {});
+        db.run("ALTER TABLE reviews ADD COLUMN date_text TEXT", () => {});
+        db.run("ALTER TABLE reviews ADD COLUMN status TEXT DEFAULT 'approved'", () => {});
+        db.run("ALTER TABLE reviews ADD COLUMN verified INTEGER DEFAULT 1", () => {});
+
+        db.get("SELECT COUNT(*) as count FROM reviews", [], (err, row) => {
             if (!row || row.count !== 0) return;
-            const defaultSettings = [
-                { key: 'bank_account',             value: 'EG12345678901234567890 (البنك الأهلي)' },
-                { key: 'instapay',                  value: 'eslam.bk@instapay' },
-                { key: 'ewallets',                  value: '01190622530 (فودافون كاش)' },
-                { key: 'cash_on_delivery_enabled',  value: 'true' },
-                { key: 'announcement_text',         value: '["🚚 شحن مجاني للطلبات أكثر من 3,000 ج.م", "🏷️ استخدم كود DAVINCI10 للحصول على خصم 10%"]' },
-                { key: 'announcement_enabled',      value: 'true' }
+            const defaultReviews = [
+                {
+                    name: 'أحمد عبد الرحمن',
+                    rating: 5,
+                    comment: 'الحذاء الترا بوست الذهبي فخم جداً ومريح في المشي بشكل لا يوصف، والتغليف راقي يليق بماركة فخمة. الشحن وصل في أقل من 24 ساعة للقاهرة. أنصح به بشدة.',
+                    date_text: 'منذ يومين',
+                    verified: 1,
+                    status: 'approved'
+                },
+                {
+                    name: 'خالد الشمري',
+                    rating: 5,
+                    comment: 'اشتريت السترة الجلدية \'ستيلث\' فخامة الجلد الطبيعي ممتازة والقصة مضبوطة تماماً. الموقع سهل التصفح وسريع جداً في الاستخدام، خيار العرض السريع وفر عليّ الكثير من الوقت.',
+                    date_text: 'منذ أسبوع',
+                    verified: 1,
+                    status: 'approved'
+                }
             ];
-            const stmt = db.prepare("INSERT INTO settings (key, value) VALUES (?, ?)");
-            defaultSettings.forEach(s => stmt.run(s.key, s.value));
+            const stmt = db.prepare("INSERT INTO reviews (name, rating, comment, date_text, verified, status) VALUES (?, ?, ?, ?, ?, ?)");
+            defaultReviews.forEach(r => stmt.run(r.name, r.rating, r.comment, r.date_text, r.verified, r.status));
             stmt.finalize();
-            console.log("[DB] Default payment and announcement settings seeded.");
+            console.log("[DB] Default reviews seeded.");
         });
     });
 }

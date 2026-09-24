@@ -29,7 +29,10 @@ if (fs.existsSync(envPath)) {
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const SECRET_KEY = 'davinci_store_secret_2026';
+const SECRET_KEY = process.env.JWT_SECRET || 'davinci_store_secret_2026_fallback_change_me';
+if (!process.env.JWT_SECRET) {
+    console.warn('[SECURITY] JWT_SECRET not set in env — using insecure fallback. Set JWT_SECRET in your .env or Render env vars!');
+}
 
 // ─── Configure Cloudinary ─────────────────────────────────────────────────
 // Supports two styles:
@@ -105,7 +108,7 @@ const uploadImage = async (file) => {
 const storage = multer.memoryStorage();
 const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } });
 
-// ─── Security: Rate Limiter (login endpoint) ───────────────────────────
+// ─── Security: Rate Limiters ───────────────────────────────────────────────
 const loginLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,   // 15 minutes
     max: 5,                      // 5 attempts per window
@@ -115,27 +118,61 @@ const loginLimiter = rateLimit({
     skipSuccessfulRequests: true // Don't count successful logins
 });
 
+// Review submission: max 5 per hour per IP
+const reviewLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000,   // 1 hour
+    max: 5,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'لقد تجاوزت الحد المسموح لإضافة التعليقات. حاول مرة أخرى بعد ساعة.' }
+});
+
+// Register: max 3 accounts per hour per IP
+const registerLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000,
+    max: 3,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'تجاوزت الحد المسموح لإنشاء الحسابات.' }
+});
+
 // ─── Middleware ────────────────────────────────────────────────────────────
 app.use(helmet({
     contentSecurityPolicy: false,
     crossOriginEmbedderPolicy: false
 }));
-app.use(cors({ origin: true, credentials: true }));
+// ─── CORS: restrict to known origins ─────────────────────────────────────
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
+    .split(',')
+    .map(o => o.trim())
+    .filter(Boolean);
+// If no env var is set, allow all origins (dev mode). Set ALLOWED_ORIGINS in production.
+app.use(cors({
+    origin: allowedOrigins.length > 0 ? allowedOrigins : true,
+    credentials: true
+}));
 app.use(express.json({ limit: '2mb' }));         // Limit JSON body size
 app.use(express.urlencoded({ extended: false, limit: '2mb' }));
-const noCacheStatic = {
-    etag: false,
-    lastModified: false,
-    setHeaders: (res) => {
-        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-        res.setHeader('Pragma', 'no-cache');
-        res.setHeader('Expires', '0');
-    }
-};
+// ─── Global Anti-Cache Middleware ──────────────────────────────────────────
+app.use((req, res, next) => {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    res.setHeader('Surrogate-Control', 'no-store');
+    next();
+});
 
-app.use('/assets/images', express.static(path.join(__dirname, '../assets/images')));
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-app.use(express.static(path.join(__dirname, '../'), noCacheStatic));
+// Static files — global anti-cache middleware above already handles all responses
+app.use('/assets/images', express.static(path.join(__dirname, '../assets/images'), { etag: false, lastModified: false }));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'), { etag: false, lastModified: false }));
+
+// Explicit SEO Static Routes
+app.get('/robots.txt', (req, res) => res.sendFile(path.resolve(__dirname, '../robots.txt')));
+app.get('/sitemap.xml', (req, res) => res.sendFile(path.resolve(__dirname, '../sitemap.xml')));
+app.get('/favicon.ico', (req, res) => res.sendFile(path.resolve(__dirname, '../favicon.svg')));
+app.get('/favicon.svg', (req, res) => res.sendFile(path.resolve(__dirname, '../favicon.svg')));
+
+app.use(express.static(path.join(__dirname, '../'), { etag: false, lastModified: false }));
 
 // Authentication Middleware
 const authenticateToken = (req, res, next) => {
@@ -186,7 +223,7 @@ app.post('/api/auth/login', loginLimiter, (req, res) => {
 });
 
 // Register User (disabled for admin panel — admin is seeded)
-app.post('/api/auth/register', (req, res) => {
+app.post('/api/auth/register', registerLimiter, (req, res) => {
     const { username, password } = req.body;
     if (!username || !password || username.trim().length < 3 || password.length < 6) {
         return res.status(400).json({ error: 'البيانات المدخلة غير صالحة' });
@@ -206,28 +243,25 @@ app.post('/api/auth/register', (req, res) => {
 
 // Google Auth
 app.post('/api/auth/google', async (req, res) => {
-    const { idToken, isMock, mockData } = req.body;
+    const { idToken } = req.body;
     let email, name, picture;
 
-    if (isMock) {
-        // Mock Auth for testing/fallback
-        email = mockData?.email || 'eslam.customer@gmail.com';
-        name = mockData?.name || 'عميل تجريبي جوجل';
-        picture = mockData?.picture || '';
-    } else {
-        // Real Google Token Verification
-        try {
-            const googleRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${idToken}`);
-            if (!googleRes.ok) {
-                return res.status(400).json({ error: "فشل التحقق من رمز تسجيل الدخول الخاص بجوجل" });
-            }
-            const tokenInfo = await googleRes.json();
-            email = tokenInfo.email;
-            name = tokenInfo.name;
-            picture = tokenInfo.picture;
-        } catch (err) {
-            return res.status(500).json({ error: "خطأ أثناء الاتصال بخوادم جوجل" });
+    // Real Google Token Verification only — mock mode removed for security
+    if (!idToken) {
+        return res.status(400).json({ error: "رمز التحقق من جوجل مطلوب" });
+    }
+    try {
+        const googleRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${idToken}`);
+        if (!googleRes.ok) {
+            return res.status(400).json({ error: "فشل التحقق من رمز تسجيل الدخول الخاص بجوجل" });
         }
+        const tokenInfo = await googleRes.json();
+        email = tokenInfo.email;
+        name = tokenInfo.name;
+        picture = tokenInfo.picture;
+    } catch (err) {
+        console.error('[Google Auth] Error:', err.message);
+        return res.status(500).json({ error: "خطأ أثناء الاتصال بخوادم جوجل" });
     }
 
     if (!email) {
@@ -236,7 +270,7 @@ app.post('/api/auth/google', async (req, res) => {
 
     // Check if user exists
     db.get("SELECT * FROM users WHERE username = ?", [email], (err, user) => {
-        if (err) return res.status(500).json({ error: err.message });
+        if (err) { console.error('[DB] Google auth lookup:', err.message); return res.status(500).json({ error: 'خطأ في الخادم' }); }
 
         if (user) {
             // Update profile info if changed
@@ -251,7 +285,7 @@ app.post('/api/auth/google', async (req, res) => {
         } else {
             // Register new user authenticated via Google
             db.run("INSERT INTO users (username, name, picture, role) VALUES (?, ?, ?, 'user')", [email, name, picture], function(insErr) {
-                if (insErr) return res.status(500).json({ error: insErr.message });
+                if (insErr) { console.error('[DB] Google auth insert:', insErr.message); return res.status(500).json({ error: 'خطأ في الخادم' }); }
                 const token = jwt.sign(
                     { id: this.lastID, username: email, role: 'user', name, picture },
                     SECRET_KEY,
@@ -267,25 +301,31 @@ app.post('/api/auth/google', async (req, res) => {
 // Update Admin Credentials
 app.put('/api/auth/update', authenticateToken, isAdmin, (req, res) => {
     const { newUsername, newPassword } = req.body;
+    if (!newUsername || newUsername.trim().length < 3) {
+        return res.status(400).json({ error: 'اسم المستخدم يجب أن يكون 3 أحرف على الأقل' });
+    }
     let query = "UPDATE users SET username = ? WHERE id = ?";
-    let params = [newUsername, req.user.id];
+    let params = [newUsername.trim(), req.user.id];
 
     if (newPassword) {
+        if (newPassword.length < 6) {
+            return res.status(400).json({ error: 'كلمة المرور يجب أن تكون 6 أحرف على الأقل' });
+        }
         const hash = bcrypt.hashSync(newPassword, 10);
         query = "UPDATE users SET username = ?, password = ? WHERE id = ?";
-        params = [newUsername, hash, req.user.id];
+        params = [newUsername.trim(), hash, req.user.id];
     }
 
     db.run(query, params, function(err) {
-        if (err) return res.status(500).json({ error: err.message });
-        res.json({ message: "Credentials updated successfully" });
+        if (err) { console.error('[DB] Update admin:', err.message); return res.status(500).json({ error: 'خطأ في الخادم' }); }
+        res.json({ message: "تم تحديث بيانات الدخول بنجاح" });
     });
 });
 
 // ======================== PRODUCTS ROUTES ========================
 app.get('/api/products', (req, res) => {
     db.all("SELECT * FROM products", [], (err, rows) => {
-        if (err) return res.status(500).json({ error: err.message });
+        if (err) { console.error('[DB]', err.message); return res.status(500).json({ error: "خطأ في الخادم" }); }
         
         // Parse JSON strings back to objects + normalise column names to camelCase for frontend
         const products = rows.map(r => {
@@ -349,7 +389,7 @@ app.post('/api/products', authenticateToken, isAdmin, upload.array('imagesFiles'
         inStock === 'true' || inStock === true || inStock === undefined || inStock === null ? 1 : 0, 
         featured === 'true' || featured === true ? 1 : 0
     ], function(err) {
-        if (err) return res.status(500).json({ error: err.message });
+        if (err) { console.error('[DB]', err.message); return res.status(500).json({ error: "خطأ في الخادم" }); }
         res.json({ id: this.lastID, message: "Product added successfully" });
     });
 });
@@ -397,22 +437,131 @@ app.put('/api/products/:id', authenticateToken, isAdmin, upload.array('imagesFil
         featured === 'true' || featured === true ? 1 : 0, 
         req.params.id
     ], function(err) {
-        if (err) return res.status(500).json({ error: err.message });
+        if (err) { console.error('[DB]', err.message); return res.status(500).json({ error: "خطأ في الخادم" }); }
         res.json({ message: "Product updated successfully" });
     });
 });
 
 app.delete('/api/products/:id', authenticateToken, isAdmin, (req, res) => {
     db.run("DELETE FROM products WHERE id = ?", [req.params.id], function(err) {
-        if (err) return res.status(500).json({ error: err.message });
+        if (err) { console.error('[DB]', err.message); return res.status(500).json({ error: "خطأ في الخادم" }); }
         res.json({ message: "Product deleted" });
     });
+});
+
+// ======================== CATEGORIES ROUTES ========================
+app.get('/api/categories', (req, res) => {
+    db.all("SELECT * FROM categories ORDER BY id ASC", [], (err, rows) => {
+        if (err) { console.error('[DB]', err.message); return res.status(500).json({ error: "خطأ في الخادم" }); }
+        res.json(rows);
+    });
+});
+
+app.post('/api/categories', authenticateToken, isAdmin, upload.single('categoryImageFile'), async (req, res) => {
+    const body = req.body || {};
+    const key = body.key;
+    const name = body.name;
+    const icon = body.icon;
+    let image = body.image || '';
+
+    if (!key || !name) {
+        return res.status(400).json({ error: "اسم الفئة والمعرّف مطلوبان" });
+    }
+
+    try {
+        if (req.file) {
+            image = await uploadImage(req.file);
+        }
+    } catch (uploadError) {
+        console.error("Category image upload error:", uploadError);
+        return res.status(500).json({ error: "فشل رفع صورة الفئة" });
+    }
+
+    const cleanKey = String(key).trim().toLowerCase().replace(/\s+/g, '-');
+    const defaultImg = `./assets/images/cat_${cleanKey}.jpg`;
+    const finalImage = image || defaultImg;
+
+    db.run(
+        "INSERT INTO categories (key, name, icon, image) VALUES (?, ?, ?, ?)",
+        [cleanKey, String(name).trim(), icon || 'fa-tag', finalImage],
+        function(err) {
+            if (err) {
+                if (err.message && err.message.includes('UNIQUE constraint failed')) {
+                    return res.status(400).json({ error: "معرّف الفئة مسجل بالفعل" });
+                }
+                console.error('[DB]', err ? err.message : '');
+                return res.status(500).json({ error: "خطأ في الخادم" });
+            }
+            res.json({ id: this.lastID, key: cleanKey, name, icon, image: finalImage, message: "Category created successfully" });
+        }
+    );
+});
+
+app.put('/api/categories/:id', authenticateToken, isAdmin, upload.single('categoryImageFile'), async (req, res) => {
+    const body = req.body || {};
+    const name = body.name;
+    const icon = body.icon;
+    let image = body.image;
+
+    if (!name) {
+        return res.status(400).json({ error: "اسم الفئة مطلوب" });
+    }
+
+    try {
+        if (req.file) {
+            image = await uploadImage(req.file);
+        }
+    } catch (uploadError) {
+        console.error("Category image upload error:", uploadError);
+        return res.status(500).json({ error: "فشل رفع صورة الفئة" });
+    }
+
+    if (image !== undefined && image !== null && image !== '') {
+        db.run(
+            "UPDATE categories SET name = ?, icon = ?, image = ? WHERE id = ?",
+            [String(name).trim(), icon || 'fa-tag', image, req.params.id],
+            function(err) {
+                if (err) { console.error('[DB]', err.message); return res.status(500).json({ error: "خطأ في الخادم" }); }
+                res.json({ message: "Category updated successfully" });
+            }
+        );
+    } else {
+        db.run(
+            "UPDATE categories SET name = ?, icon = ? WHERE id = ?",
+            [String(name).trim(), icon || 'fa-tag', req.params.id],
+            function(err) {
+                if (err) { console.error('[DB]', err.message); return res.status(500).json({ error: "خطأ في الخادم" }); }
+                res.json({ message: "Category updated successfully" });
+            }
+        );
+    }
+});
+
+app.delete('/api/categories/:id', authenticateToken, isAdmin, (req, res) => {
+    db.run("DELETE FROM categories WHERE id = ?", [req.params.id], function(err) {
+        if (err) { console.error('[DB]', err.message); return res.status(500).json({ error: "خطأ في الخادم" }); }
+        res.json({ message: "Category deleted successfully" });
+    });
+});
+
+// Upload Hero Slider Image
+app.post('/api/upload-hero-image', authenticateToken, isAdmin, upload.single('heroImage'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: "يرجى اختيار صورة أولاً" });
+        }
+        const imageUrl = await uploadImage(req.file);
+        res.json({ imageUrl, message: "Image uploaded successfully" });
+    } catch (err) {
+        console.error("Hero upload error:", err);
+        res.status(500).json({ error: "فشل رفع صورة الهيرو" });
+    }
 });
 
 // ======================== SETTINGS ROUTES ========================
 app.get('/api/settings', (req, res) => {
     db.all('SELECT * FROM settings', [], (err, rows) => {
-        if (err) return res.status(500).json({ error: err.message });
+        if (err) { console.error('[DB]', err.message); return res.status(500).json({ error: "خطأ في الخادم" }); }
         const settings = {};
         rows.forEach(r => { settings[r.key] = r.value; });
         res.json(settings);
@@ -422,8 +571,9 @@ app.get('/api/settings', (req, res) => {
 app.put('/api/settings', authenticateToken, isAdmin, async (req, res) => {
     const allowed = [
         'bank_account', 'instapay', 'ewallets',
-        'cash_on_delivery_enabled',
-        'announcement_text', 'announcement_enabled'
+        'cash_on_delivery_enabled', 'reviews_enabled',
+        'announcement_text', 'announcement_enabled',
+        'theme_color', 'theme_mode', 'hero_slides', 'store_features'
     ];
 
     const upsert = (key, val) => {
@@ -453,8 +603,198 @@ app.put('/api/settings', authenticateToken, isAdmin, async (req, res) => {
         await Promise.all(updates);
         res.json({ message: 'Settings updated successfully' });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        console.error('[DB]', err.message); res.status(500).json({ error: "خطأ في الخادم" });
     }
+});
+
+// Helper function: relative time formatting in Arabic
+function formatRelativeTimeArabic(dateString, dateTextFallback) {
+    if (!dateString || dateString === 'CURRENT_DATETIME') {
+        return (dateTextFallback && dateTextFallback !== 'الآن') ? dateTextFallback : 'الآن';
+    }
+    const date = new Date(dateString.includes('T') || dateString.includes('Z') ? dateString : dateString.replace(' ', 'T') + 'Z');
+    if (isNaN(date.getTime())) {
+        return (dateTextFallback && dateTextFallback !== 'الآن') ? dateTextFallback : 'الآن';
+    }
+
+    const now = new Date();
+    const diffSeconds = Math.max(0, Math.floor((now.getTime() - date.getTime()) / 1000));
+
+    if (diffSeconds < 60) return 'الآن';
+
+    const diffMinutes = Math.floor(diffSeconds / 60);
+    if (diffMinutes < 60) {
+        if (diffMinutes === 1) return 'منذ دقيقة';
+        if (diffMinutes === 2) return 'منذ دقيقتين';
+        if (diffMinutes >= 3 && diffMinutes <= 10) return `منذ ${diffMinutes} دقائق`;
+        return `منذ ${diffMinutes} دقيقة`;
+    }
+
+    const diffHours = Math.floor(diffMinutes / 60);
+    if (diffHours < 24) {
+        if (diffHours === 1) return 'منذ ساعة';
+        if (diffHours === 2) return 'منذ ساعتين';
+        if (diffHours >= 3 && diffHours <= 10) return `منذ ${diffHours} ساعات`;
+        return `منذ ${diffHours} ساعة`;
+    }
+
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays < 7) {
+        if (diffDays === 1) return 'منذ يوم';
+        if (diffDays === 2) return 'منذ يومين';
+        if (diffDays >= 3 && diffDays <= 10) return `منذ ${diffDays} أيام`;
+        return `منذ ${diffDays} يوماً`;
+    }
+
+    const diffWeeks = Math.floor(diffDays / 7);
+    if (diffWeeks < 4) {
+        if (diffWeeks === 1) return 'منذ أسبوع';
+        if (diffWeeks === 2) return 'منذ أسبوعين';
+        return `منذ ${diffWeeks} أسابيع`;
+    }
+
+    const diffMonths = Math.floor(diffDays / 30);
+    if (diffMonths < 12) {
+        if (diffMonths === 1) return 'منذ شهر';
+        if (diffMonths === 2) return 'منذ شهرين';
+        if (diffMonths >= 3 && diffMonths <= 10) return `منذ ${diffMonths} أشهر`;
+        return `منذ ${diffMonths} شهراً`;
+    }
+
+    const diffYears = Math.floor(diffDays / 365);
+    if (diffYears === 1) return 'منذ سنة';
+    if (diffYears === 2) return 'منذ سنتين';
+    return `منذ ${diffYears} سنوات`;
+}
+
+// ======================== REVIEWS ROUTES ========================
+app.get('/api/reviews', (req, res) => {
+    db.get("SELECT value FROM settings WHERE key = 'reviews_enabled'", [], (err, setRow) => {
+        const isEnabled = !setRow || setRow.value !== 'false';
+        
+        db.all("SELECT * FROM reviews WHERE status IS NULL OR status = '' OR status = 'approved' ORDER BY id DESC", [], (err2, rows) => {
+            if (err2) return res.status(500).json({ error: err2.message });
+            
+            const totalCount = rows.length;
+            let sumRating = 0;
+            const counts = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+
+            rows.forEach(r => {
+                const rVal = Math.max(1, Math.min(5, Math.round(r.rating || 5)));
+                counts[rVal] = (counts[rVal] || 0) + 1;
+                sumRating += parseFloat(r.rating) || 5;
+            });
+
+            const avgRating = totalCount > 0 ? (sumRating / totalCount).toFixed(1) : '4.8';
+            const percentages = {
+                5: totalCount > 0 ? Math.round((counts[5] / totalCount) * 100) : 82,
+                4: totalCount > 0 ? Math.round((counts[4] / totalCount) * 100) : 12,
+                3: totalCount > 0 ? Math.round((counts[3] / totalCount) * 100) : 4,
+                2: totalCount > 0 ? Math.round((counts[2] / totalCount) * 100) : 1,
+                1: totalCount > 0 ? Math.round((counts[1] / totalCount) * 100) : 1
+            };
+
+            res.json({
+                enabled: isEnabled,
+                reviews: rows.map(r => ({
+                    id: r.id,
+                    name: r.name,
+                    rating: r.rating,
+                    comment: r.comment,
+                    dateText: formatRelativeTimeArabic(r.created_at, r.date_text),
+                    verified: r.verified === 1 || r.verified === true || r.verified === 'true'
+                })),
+                stats: {
+                    avgRating,
+                    totalCount: 1420 + totalCount,
+                    percentages
+                }
+            });
+        });
+    });
+});
+
+app.post('/api/reviews', reviewLimiter, (req, res) => {
+    const { name, rating, comment } = req.body;
+    if (!name || !comment) {
+        return res.status(400).json({ error: 'يرجى كتابة الاسم والتعليق' });
+    }
+    const rateVal = Math.max(1, Math.min(5, parseFloat(rating) || 5));
+    const nowIso = new Date().toISOString();
+    db.run(
+        "INSERT INTO reviews (name, rating, comment, date_text, verified, status, created_at) VALUES (?, ?, ?, 'الآن', 1, 'approved', ?)",
+        [name.trim(), rateVal, comment.trim(), nowIso],
+        function(err) {
+            if (err) { console.error('[DB] Insert review:', err.message); return res.status(500).json({ error: 'خطأ في الخادم' }); }
+            res.json({
+                success: true,
+                id: this.lastID,
+                review: {
+                    id: this.lastID,
+                    name: name.trim(),
+                    rating: rateVal,
+                    comment: comment.trim(),
+                    dateText: 'الآن',
+                    verified: true
+                },
+                message: 'شكراً لك! تم إضافة رأيك وتجربتك بنجاح.'
+            });
+        }
+    );
+});
+
+// Admin Reviews CRUD
+app.get('/api/admin/reviews', authenticateToken, isAdmin, (req, res) => {
+    db.all("SELECT * FROM reviews ORDER BY id DESC", [], (err, rows) => {
+        if (err) { console.error('[DB]', err.message); return res.status(500).json({ error: "خطأ في الخادم" }); }
+        res.json(rows.map(r => ({
+            id: r.id,
+            name: r.name,
+            rating: r.rating,
+            comment: r.comment,
+            dateText: formatRelativeTimeArabic(r.created_at, r.date_text),
+            verified: r.verified === 1 || r.verified === true || r.verified === 'true',
+            status: r.status || 'approved'
+        })));
+    });
+});
+
+app.post('/api/admin/reviews', authenticateToken, isAdmin, (req, res) => {
+    const { name, rating, comment, dateText, verified, status } = req.body;
+    if (!name || !comment) {
+        return res.status(400).json({ error: 'الاسم والتعليق مطلوبان' });
+    }
+    db.run(
+        "INSERT INTO reviews (name, rating, comment, date_text, verified, status) VALUES (?, ?, ?, ?, ?, ?)",
+        [name.trim(), parseFloat(rating) || 5, comment.trim(), dateText || 'الآن', verified ? 1 : 0, status || 'approved'],
+        function(err) {
+            if (err) { console.error('[DB]', err.message); return res.status(500).json({ error: "خطأ في الخادم" }); }
+            res.json({ success: true, id: this.lastID, message: 'تم إضافة التقييم بنجاح' });
+        }
+    );
+});
+
+app.put('/api/admin/reviews/:id', authenticateToken, isAdmin, (req, res) => {
+    const { id } = req.params;
+    const { name, rating, comment, dateText, verified, status } = req.body;
+    const finalDateText = (dateText && dateText.trim()) ? dateText.trim() : 'الآن';
+    const finalStatus = (status && status.trim()) ? status.trim() : 'approved';
+    db.run(
+        "UPDATE reviews SET name = ?, rating = ?, comment = ?, date_text = ?, verified = ?, status = ? WHERE id = ?",
+        [name ? name.trim() : '', parseFloat(rating) || 5, comment ? comment.trim() : '', finalDateText, verified ? 1 : 0, finalStatus, id],
+        function(err) {
+            if (err) { console.error('[DB]', err.message); return res.status(500).json({ error: "خطأ في الخادم" }); }
+            res.json({ success: true, message: 'تم تحديث التقييم بنجاح' });
+        }
+    );
+});
+
+app.delete('/api/admin/reviews/:id', authenticateToken, isAdmin, (req, res) => {
+    const { id } = req.params;
+    db.run("DELETE FROM reviews WHERE id = ?", [id], function(err) {
+        if (err) { console.error('[DB]', err.message); return res.status(500).json({ error: "خطأ في الخادم" }); }
+        res.json({ success: true, message: 'تم حذف التقييم بنجاح' });
+    });
 });
 
 // ======================== ORDERS ROUTES ========================
@@ -469,7 +809,7 @@ app.post('/api/orders', (req, res) => {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, 
         [orderNumber, customer_name, phone, address, governorate, city, payment_method, subtotal, discount, total, initialStatus, payment_sender || null, payment_reference || null], 
         function(err) {
-            if (err) return res.status(500).json({ error: err.message });
+            if (err) { console.error('[DB]', err.message); return res.status(500).json({ error: "خطأ في الخادم" }); }
             
             const orderId = this.lastID;
             const itemPromises = items.map(item => {
@@ -498,10 +838,10 @@ app.post('/api/orders', (req, res) => {
 
 app.get('/api/orders', authenticateToken, isAdmin, (req, res) => {
     db.all("SELECT * FROM orders ORDER BY created_at DESC", [], (err, orders) => {
-        if (err) return res.status(500).json({ error: err.message });
+        if (err) { console.error('[DB]', err.message); return res.status(500).json({ error: "خطأ في الخادم" }); }
         
         db.all("SELECT * FROM order_items", [], (err, items) => {
-            if (err) return res.status(500).json({ error: err.message });
+            if (err) { console.error('[DB]', err.message); return res.status(500).json({ error: "خطأ في الخادم" }); }
             
             // Map items to their respective orders
             const ordersWithItems = orders.map(order => {
@@ -519,20 +859,28 @@ app.get('/api/orders', authenticateToken, isAdmin, (req, res) => {
 app.put('/api/orders/:id/status', authenticateToken, isAdmin, (req, res) => {
     const { status } = req.body;
     db.run("UPDATE orders SET status = ? WHERE id = ?", [status, req.params.id], function(err) {
-        if (err) return res.status(500).json({ error: err.message });
+        if (err) { console.error('[DB]', err.message); return res.status(500).json({ error: "خطأ في الخادم" }); }
         res.json({ message: "Order status updated successfully" });
     });
 });
 
 app.delete('/api/orders/:id', authenticateToken, isAdmin, (req, res) => {
     db.run("DELETE FROM order_items WHERE order_id = ?", [req.params.id], function(err) {
-        if (err) return res.status(500).json({ error: err.message });
+        if (err) { console.error('[DB]', err.message); return res.status(500).json({ error: "خطأ في الخادم" }); }
         
         db.run("DELETE FROM orders WHERE id = ?", [req.params.id], function(err) {
-            if (err) return res.status(500).json({ error: err.message });
+            if (err) { console.error('[DB]', err.message); return res.status(500).json({ error: "خطأ في الخادم" }); }
             res.json({ message: "Order deleted successfully" });
         });
     });
+});
+
+// ─── Global Error Handler ──────────────────────────────────────────────────
+// Catches any unhandled errors thrown in route handlers
+app.use((err, req, res, next) => {
+    console.error('[SERVER] Unhandled error:', err.message || err);
+    if (res.headersSent) return next(err);
+    res.status(500).json({ error: 'خطأ داخلي في الخادم' });
 });
 
 app.listen(PORT, "0.0.0.0", () => {

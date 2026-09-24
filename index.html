@@ -6,6 +6,20 @@
   <title>Da Vinci Store | متجر الأزياء والأحذية الفاخرة</title>
   <meta name="description" content="اكتشف التشكيلة الحصرية من الملابس والأحذية والإكسسوارات الفاخرة في متجر Da Vinci Store. تجربة تسوق فريدة وجودة لا تضاهى.">
   
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="./favicon.svg">
+  <link rel="alternate icon" href="./favicon.ico">
+
+  <!-- Open Graph / Social Media Metadata -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://davincistore.com/">
+  <meta property="og:title" content="Da Vinci Store | متجر الأزياء والأحذية الفاخرة">
+  <meta property="og:description" content="اكتشف التشكيلة الحصرية من الملابس والأحذية والإكسسوارات الفاخرة في متجر Da Vinci Store.">
+  <meta property="og:image" content="./assets/images/hero_slide_1.jpg">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Da Vinci Store | متجر الأزياء والأحذية الفاخرة">
+  <meta name="twitter:description" content="اكتشف التشكيلة الحصرية من الملابس والأحذية والإكسسوارات الفاخرة في متجر Da Vinci Store.">
+
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -15,7 +29,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   
   <!-- Custom Stylesheet -->
-  <link rel="stylesheet" href="./style.css">
+  <link rel="stylesheet" href="./style.css?v=20260920_v3">
 
   <!-- Google Identity Services -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -56,8 +70,9 @@
         <!-- Navbar Controls & Action Icons -->
         <div class="navbar-controls">
           <!-- Search Bar Toggle (Desktop/Mobile) -->
-          <div class="search-wrapper">
-            <input type="text" id="searchInput" placeholder="ابحث عن منتجك الفاخر..." aria-label="بحث عن منتجات">
+          <div class="search-wrapper" id="searchWrapper">
+            <button id="closeMobileSearchBtn" class="search-close-btn" aria-label="إغلاق البحث"><i class="fa-solid fa-xmark"></i></button>
+            <input type="text" id="searchInput" placeholder="ابحث عن منتجك الفاخر..." aria-label="بحث عن منتجات" autocomplete="off">
             <button id="searchBtn" class="control-btn" aria-label="بحث"><i class="fa-solid fa-magnifying-glass"></i></button>
           </div>
 
@@ -109,7 +124,7 @@
   <section class="hero-slider-section">
     <div class="hero-slider" id="heroSlider">
       <!-- Slide 1 -->
-      <div class="slide active" style="background-image: linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.75)), url('./assets/images/hero_slide_1.jpg');">
+      <div class="slide active" style="background-color: #0d0d0d;">
         <div class="slide-content">
           <span class="slide-subtitle">مجموعة الصيف الفخمة 2026</span>
           <h1 class="slide-title">أناقة تتحدث عن هويتك</h1>
@@ -121,7 +136,7 @@
         </div>
       </div>
       <!-- Slide 2 -->
-      <div class="slide" style="background-image: linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.75)), url('./assets/images/hero_slide_2.jpg');">
+      <div class="slide" style="background-color: #0d0d0d;">
         <div class="slide-content">
           <span class="slide-subtitle">خطوات من التميز</span>
           <h1 class="slide-title">خطوتك القادمة أكثر فخامة</h1>
@@ -318,86 +333,115 @@
     </div>
   </main>
 
-  <!-- ==================== PREMIUM USER FEEDBACK / REVIEWS ==================== -->
-  <section class="reviews-section">
-    <div class="section-title-wrapper">
-      <span class="section-subtitle">آراء عملائنا النخبة</span>
-      <h2 class="section-title">تقييمات وتجارب راقية</h2>
-      <div class="title-divider"></div>
-    </div>
-    
-    <div class="reviews-container">
-      <div class="reviews-summary-card">
-        <div class="average-rating">
-          <h3>4.8</h3>
-          <div class="stars">
-            <i class="fa-solid fa-star"></i>
-            <i class="fa-solid fa-star"></i>
-            <i class="fa-solid fa-star"></i>
-            <i class="fa-solid fa-star"></i>
-            <i class="fa-solid fa-star-half-stroke"></i>
+
+
+  <!-- ==================== COMMENTS / REVIEWS SECTION ==================== -->
+  <section class="store-comments-section">
+    <div class="store-comments-container">
+      <div class="section-title-wrapper" style="text-align: center; margin-bottom: 40px;">
+        <span class="section-subtitle">آراء عملائنا النخبة</span>
+        <h2 class="section-title">تقييمات وتجارب المتجر</h2>
+        <div class="title-divider"></div>
+      </div>
+
+      <!-- Professional Rating Summary Card (Always Visible) -->
+      <div id="commentsSummaryCard" class="comments-summary-card" style="margin-bottom: 45px;">
+        <div class="summary-card-inner">
+          <div class="summary-score-box">
+            <span class="summary-badge"><i class="fa-solid fa-award"></i> مشترون مؤكدون</span>
+            <h3 class="summary-score">4.9</h3>
+            <div class="summary-stars">
+              <i class="fa-solid fa-star"></i>
+              <i class="fa-solid fa-star"></i>
+              <i class="fa-solid fa-star"></i>
+              <i class="fa-solid fa-star"></i>
+              <i class="fa-solid fa-star-half-stroke"></i>
+            </div>
+            <p class="summary-total-text">تقييم عام بناءً على أكثر من 1,480+ رأي وتجربة موثقة</p>
           </div>
-          <p>تقييم عام بناءً على 1,420 رأي موثق</p>
-        </div>
-        <div class="rating-bars-container">
-          <div class="rating-bar-item">
-            <span>5 نجوم</span>
-            <div class="rating-bar"><div class="rating-progress" style="width: 82%;"></div></div>
-            <span>82%</span>
-          </div>
-          <div class="rating-bar-item">
-            <span>4 نجوم</span>
-            <div class="rating-bar"><div class="rating-progress" style="width: 12%;"></div></div>
-            <span>12%</span>
-          </div>
-          <div class="rating-bar-item">
-            <span>3 نجوم</span>
-            <div class="rating-bar"><div class="rating-progress" style="width: 4%;"></div></div>
-            <span>4%</span>
-          </div>
-          <div class="rating-bar-item">
-            <span>نجمتان</span>
-            <div class="rating-bar"><div class="rating-progress" style="width: 1%;"></div></div>
-            <span>1%</span>
-          </div>
-          <div class="rating-bar-item">
-            <span>نجمة</span>
-            <div class="rating-bar"><div class="rating-progress" style="width: 1%;"></div></div>
-            <span>1%</span>
+
+          <div class="summary-bars-box">
+            <div class="summary-bar-row">
+              <span>5 نجوم</span>
+              <div class="bar-track"><div class="bar-fill" style="width: 88%;"></div></div>
+              <span class="percent-val">88%</span>
+            </div>
+            <div class="summary-bar-row">
+              <span>4 نجوم</span>
+              <div class="bar-track"><div class="bar-fill" style="width: 9%;"></div></div>
+              <span class="percent-val">9%</span>
+            </div>
+            <div class="summary-bar-row">
+              <span>3 نجوم</span>
+              <div class="bar-track"><div class="bar-fill" style="width: 2%;"></div></div>
+              <span class="percent-val">2%</span>
+            </div>
+            <div class="summary-bar-row">
+              <span>نجمتان</span>
+              <div class="bar-track"><div class="bar-fill" style="width: 1%;"></div></div>
+              <span class="percent-val">1%</span>
+            </div>
+            <div class="summary-bar-row">
+              <span>نجمة واحدة</span>
+              <div class="bar-track"><div class="bar-fill" style="width: 0%;"></div></div>
+              <span class="percent-val">0%</span>
+            </div>
           </div>
         </div>
       </div>
 
-      <div class="reviews-feed">
-        <!-- Review 1 -->
-        <div class="review-item">
-          <div class="review-meta">
-            <div class="user-avatar"><i class="fa-solid fa-user-tie"></i></div>
-            <div class="user-info">
-              <h4>أحمد عبد الرحمن</h4>
-              <span class="review-date">منذ يومين</span>
+      <!-- Interactive Comments Layout (Displayed ONLY when comments are ENABLED) -->
+      <div id="commentsEnabledInteractiveLayout" class="comments-layout" style="display: none;">
+        <!-- Comment Form Card -->
+        <div class="comment-form-card">
+          <h3><i class="fa-solid fa-pen-to-square"></i> أضف تعليقك ورأيك</h3>
+          <form id="storeCommentForm">
+            <div class="form-group mb-3">
+              <label for="commentAuthorName">الاسم الكامل *</label>
+              <input type="text" id="commentAuthorName" placeholder="أدخل اسمك الكريم..." required class="comment-input">
             </div>
-            <div class="user-stars">
-              <i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i>
+            <div class="form-group mb-3">
+              <label>التقييم بالنجوم *</label>
+              <div class="interactive-star-rating" id="commentStarPicker">
+                <i class="fa-solid fa-star active" data-value="1"></i>
+                <i class="fa-solid fa-star active" data-value="2"></i>
+                <i class="fa-solid fa-star active" data-value="3"></i>
+                <i class="fa-solid fa-star active" data-value="4"></i>
+                <i class="fa-solid fa-star active" data-value="5"></i>
+              </div>
+              <input type="hidden" id="commentRatingVal" value="5">
             </div>
-          </div>
-          <p class="review-text">"الحذاء الترا بوست الذهبي فخم جداً ومريح في المشي بشكل لا يوصف، والتغليف راقي يليق بماركة فخمة. الشحن وصل في أقل من 24 ساعة للقاهرة. أنصح به بشدة."</p>
-          <span class="verified-purchase"><i class="fa-solid fa-circle-check"></i> مشترٍ مؤكد</span>
+            <div class="form-group mb-3">
+              <label for="commentTextContent">تعليقك وتجربتك *</label>
+              <textarea id="commentTextContent" rows="4" placeholder="اكتب تعليقك هنا بحرية..." required class="comment-input"></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary w-100" id="submitCommentBtn">
+              إرسال التعليق <i class="fa-solid fa-paper-plane"></i>
+            </button>
+          </form>
         </div>
-        <!-- Review 2 -->
-        <div class="review-item">
-          <div class="review-meta">
-            <div class="user-avatar"><i class="fa-solid fa-user"></i></div>
-            <div class="user-info">
-              <h4>خالد الشمري</h4>
-              <span class="review-date">منذ أسبوع</span>
+
+        <!-- Comments Feed -->
+        <div class="comments-feed-wrapper">
+          <div class="comments-nav-bar">
+            <div class="comments-count-info">
+              <i class="fa-solid fa-comments" style="color: var(--color-gold);"></i>
+              <span>آراء العملاء الحالية</span>
             </div>
-            <div class="user-stars">
-              <i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i>
+            <div class="comments-scroll-controls">
+              <span class="scroll-hint-label">تصفح التعليقات</span>
+              <button type="button" id="scrollCommentsUpBtn" class="comments-nav-arrow-btn" aria-label="أعلى" title="التنقل لأعلى">
+                <i class="fa-solid fa-chevron-up"></i>
+              </button>
+              <button type="button" id="scrollCommentsDownBtn" class="comments-nav-arrow-btn" aria-label="أسفل" title="التنقل لأسفل">
+                <i class="fa-solid fa-chevron-down"></i>
+              </button>
             </div>
           </div>
-          <p class="review-text">"اشتريت السترة الجلدية 'ستيلث' فخامة الجلد الطبيعي ممتازة والقصة مضبوطة تماماً. الموقع سهل التصفح وسريع جداً في الاستخدام، خيار العرض السريع وفر عليّ الكثير من الوقت."</p>
-          <span class="verified-purchase"><i class="fa-solid fa-circle-check"></i> مشترٍ مؤكد</span>
+
+          <div id="storeCommentsList" class="comments-list">
+            <!-- Dynamically populated via main.js -->
+          </div>
         </div>
       </div>
     </div>
@@ -427,10 +471,10 @@
         </a>
         <p class="footer-brand-desc">عنوان الفخامة والرقي في عالم الأزياء والملابس والأحذية. نختار لكم أفضل الخامات وأحدث خطوط الموضة العالمية بدقة متناهية لتتميز في كل مناسبة.</p>
         <div class="social-links">
-          <a href="#" aria-label="فيسبوك"><i class="fa-brands fa-facebook-f"></i></a>
-          <a href="#" aria-label="انستجرام"><i class="fa-brands fa-instagram"></i></a>
-          <a href="#" aria-label="تويتر"><i class="fa-brands fa-twitter"></i></a>
-          <a href="#" aria-label="تيك توك"><i class="fa-brands fa-tiktok"></i></a>
+          <a href="https://facebook.com" target="_blank" rel="noopener noreferrer" aria-label="فيسبوك"><i class="fa-brands fa-facebook-f"></i></a>
+          <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" aria-label="انستجرام"><i class="fa-brands fa-instagram"></i></a>
+          <a href="https://twitter.com" target="_blank" rel="noopener noreferrer" aria-label="تويتر"><i class="fa-brands fa-twitter"></i></a>
+          <a href="https://tiktok.com" target="_blank" rel="noopener noreferrer" aria-label="تيك توك"><i class="fa-brands fa-tiktok"></i></a>
         </div>
       </div>
       <div class="footer-col">
@@ -873,8 +917,13 @@
     </div>
   </div>
 
+  <!-- Search Suggestions Dropdown — appended to body to avoid header overflow/layout issues -->
+  <div class="search-suggestions" id="searchSuggestions" role="listbox" aria-label="اقتراحات البحث"></div>
+
+
+
   <!-- Loaded Scripts -->
   <script src="./products.js"></script>
-  <script src="./main.js"></script>
+  <script src="./main.js?v=20260920_v3"></script>
 </body>
 </html>

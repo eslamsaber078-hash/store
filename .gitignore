@@ -1,11 +1,27 @@
+# ─── Dependencies ─────────────────────────────────────────────────────────────
 node_modules/
-backend/node_modules/
-backend/database.sqlite
-backend/database.sqlite-journal
 
-# Environment secrets — NEVER commit these
+# ─── Environment & Secrets (NEVER commit these) ───────────────────────────────
 .env
-backend/.env
+*.env
+.env.local
+.env.production
 
-# Local uploaded images (ephemeral, use Cloudinary instead)
-backend/uploads/
+# ─── SQLite database (contains live data) ────────────────────────────────────
+*.sqlite
+*.sqlite3
+*.db
+
+# ─── Uploaded files (ephemeral — use Cloudinary in production) ────────────────
+backend/uploads/
+
+# ─── OS & Editor noise ────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+
+# ─── Logs ─────────────────────────────────────────────────────────────────────
+*.log
+npm-debug.log*

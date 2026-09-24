@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <rect width="100" height="100" rx="20" fill="#0a0a0a"/>
+  <rect x="5" y="5" width="90" height="90" rx="16" fill="none" stroke="#D4AF37" stroke-width="3"/>
+  <text x="50" y="65" font-family="'Montserrat', 'Cairo', sans-serif" font-size="52" font-weight="900" fill="#D4AF37" text-anchor="middle">DV</text>
+</svg>

@@ -5,13 +5,39 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>لوحة الإدارة | Da Vinci Store</title>
   
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="./favicon.svg">
+  <link rel="alternate icon" href="./favicon.ico">
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;800&family=Montserrat:wght@300;400;600;700&family=Tajawal:wght@300;400;500;700;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   
   <link rel="stylesheet" href="./style.css">
-  <link rel="stylesheet" href="./admin.css">
+  <link rel="stylesheet" href="./admin.css?v=20260920_v3">
+  <style>
+    html.user-authenticated #loginScreen { display: none !important; }
+    html.user-authenticated #adminDashboard { display: flex !important; }
+    html:not(.user-authenticated) #loginScreen { display: flex !important; }
+    html:not(.user-authenticated) #adminDashboard { display: none !important; }
+  </style>
+  <script>
+    (function() {
+      try {
+        var savedMode = localStorage.getItem('theme_mode');
+        if (savedMode === 'light') {
+          document.documentElement.setAttribute('data-theme', 'light');
+        }
+      } catch(e) {}
+      var token = localStorage.getItem('adminToken') || localStorage.getItem('authToken');
+      if (token) {
+        document.documentElement.classList.add('user-authenticated');
+      } else {
+        document.documentElement.classList.remove('user-authenticated');
+      }
+    })();
+  </script>
 </head>
 <body class="admin-body">
 
@@ -62,7 +88,9 @@
       <ul class="admin-nav">
         <li><button class="admin-nav-btn active" data-target="ordersView"><i class="fa-solid fa-box-open"></i> الطلبات</button></li>
         <li><button class="admin-nav-btn" data-target="productsView"><i class="fa-solid fa-tags"></i> المنتجات</button></li>
-        <li><button class="admin-nav-btn" data-target="settingsView"><i class="fa-solid fa-sliders"></i> الإعدادات</button></li>
+        <li><button class="admin-nav-btn" data-target="categoriesView"><i class="fa-solid fa-list-check"></i> الفئات والأقسام</button></li>
+        <li><button class="admin-nav-btn" data-target="commentsAdminView"><i class="fa-solid fa-comments"></i> تعليقات العملاء</button></li>
+        <li><button class="admin-nav-btn" data-target="settingsView"><i class="fa-solid fa-sliders"></i> الإعدادات والتصاميم</button></li>
         <li><button class="admin-nav-btn" data-target="accountView"><i class="fa-solid fa-user-shield"></i> بيانات الحساب</button></li>
       </ul>
       <div class="admin-sidebar-footer">
@@ -123,7 +151,120 @@
       <!-- 3. Settings View -->
       <section id="settingsView" class="admin-section" style="display: none;">
         <div class="section-header">
-          <h2><i class="fa-solid fa-sliders" style="color:var(--color-gold)"></i> الإعدادات العامة</h2>
+          <h2><i class="fa-solid fa-sliders" style="color:var(--color-gold)"></i> الإعدادات العامة والتحكم بالمظهر</h2>
+        </div>
+
+        <!-- Theme Color & Styling Card -->
+        <div class="admin-card mb-4">
+          <div class="admin-card-header">
+            <h3 class="admin-card-title"><i class="fa-solid fa-palette"></i> مظهر ونمط الموقع (Dark / Light Mode)</h3>
+          </div>
+
+          <!-- Theme Mode Switch (Dark / Light) -->
+          <div class="theme-mode-selector mb-4" style="background:var(--color-bg-tertiary); padding:16px; border-radius:12px; border:1px solid var(--color-border);">
+            <label style="font-weight:700; display:block; margin-bottom:10px; color:var(--color-gold); font-size:0.98rem;">
+              <i class="fa-solid fa-circle-half-stroke"></i> اختر نمط الألوان العام للمتجر:
+            </label>
+            <div style="display:flex; gap:16px; align-items:center; flex-wrap:wrap;">
+              <label style="cursor:pointer; display:flex; align-items:center; gap:8px; font-weight:600; background:rgba(0,0,0,0.3); padding:10px 18px; border-radius:10px; border:1px solid rgba(212,175,55,0.3); color:#FFF;">
+                <input type="radio" name="themeModeRadio" value="dark" checked style="accent-color:var(--color-gold);" onchange="previewThemeMode(this.value)"> 🌙 الوضع الداكن الفاخر (Dark Mode)
+              </label>
+              <label style="cursor:pointer; display:flex; align-items:center; gap:8px; font-weight:600; background:rgba(255,255,255,0.1); padding:10px 18px; border-radius:10px; border:1px solid rgba(255,255,255,0.2); color:#FFF;">
+                <input type="radio" name="themeModeRadio" value="light" style="accent-color:var(--color-gold);" onchange="previewThemeMode(this.value)"> ☀️ الوضع الفاتح الأنيق (Light Mode)
+              </label>
+            </div>
+          </div>
+
+          <div class="color-theme-presets mb-3">
+            <label style="font-weight:600; display:block; margin-bottom:10px;">اختر اللون الرئيسي للموقع:</label>
+            <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+              <button type="button" class="btn-theme-preset btn btn-outline" data-color="#D4AF37" style="border-color:#D4AF37; color:#D4AF37;" onclick="selectThemePreset('#D4AF37')">👑 ذهبي فاخر</button>
+              <button type="button" class="btn-theme-preset btn btn-outline" data-color="#10B981" style="border-color:#10B981; color:#10B981;" onclick="selectThemePreset('#10B981')">💚 زمردي</button>
+              <button type="button" class="btn-theme-preset btn btn-outline" data-color="#3B82F6" style="border-color:#3B82F6; color:#3B82F6;" onclick="selectThemePreset('#3B82F6')">💙 أزرق ملكي</button>
+              <button type="button" class="btn-theme-preset btn btn-outline" data-color="#E11D48" style="border-color:#E11D48; color:#E11D48;" onclick="selectThemePreset('#E11D48')">❤️ أحمر ياقوتي</button>
+              <button type="button" class="btn-theme-preset btn btn-outline" data-color="#8B5CF6" style="border-color:#8B5CF6; color:#8B5CF6;" onclick="selectThemePreset('#8B5CF6')">💜 بنفسجي فخم</button>
+              <button type="button" class="btn-theme-preset btn btn-outline" data-color="#B38B46" style="border-color:#B38B46; color:#B38B46;" onclick="selectThemePreset('#B38B46')">🤎 برونزي</button>
+            </div>
+          </div>
+          <div class="form-group mb-3">
+            <label>أو اختر لوناً مخصصاً (Custom Color Picker):</label>
+            <div style="display:flex; gap:10px; align-items:center;">
+              <input type="color" id="themeColorNative" value="#D4AF37" style="width:45px; height:45px; border-radius:8px; border:none; cursor:pointer;" onchange="updateThemeColorInput(this.value)">
+              <input type="text" id="themeColorHex" value="#D4AF37" placeholder="#D4AF37" style="font-family:monospace; font-weight:bold; text-transform:uppercase; max-width:140px; padding:10px; background:var(--color-bg-tertiary); color:#fff; border:1px solid var(--color-border); border-radius:8px;" oninput="updateThemeColorInput(this.value)">
+              <span id="themeColorPreview" style="display:inline-block; width:34px; height:34px; border-radius:50%; background:#D4AF37; border:2px solid #fff; box-shadow:0 0 10px rgba(212,175,55,0.5);"></span>
+            </div>
+          </div>
+          <div>
+            <button type="button" class="btn btn-primary" onclick="saveThemeColorSettings()">
+              حفظ مظهر ونمط الموقع <i class="fa-solid fa-save"></i>
+            </button>
+            <span id="themeColorFeedback" class="feedback-msg"></span>
+          </div>
+        </div>
+
+        <!-- Hero Slider Background Images Card -->
+        <div class="admin-card mb-4">
+          <div class="admin-card-header">
+            <h3 class="admin-card-title"><i class="fa-solid fa-images"></i> صور وخلفيات واجهة الموقع (Hero Slider)</h3>
+          </div>
+          <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:20px;">
+            <!-- Slide 1 -->
+            <div style="background:var(--color-bg-tertiary); padding:18px; border-radius:12px; border:1px solid var(--color-border);">
+              <h4 style="color:var(--color-gold); margin-bottom:12px;"><i class="fa-solid fa-film"></i> الصورة الأولى (الخلفية 1)</h4>
+              <div class="form-group mb-2">
+                <label>رفع صورة من جهازك أو كتابة رابط الصورة:</label>
+                <input type="file" id="heroFile1" accept="image/*" style="margin-bottom:8px; font-size:0.85rem;" onchange="uploadHeroImageFile(1)">
+                <input type="text" id="heroImgUrl1" placeholder="./assets/images/hero_slide_1.jpg">
+              </div>
+              <div id="heroPreviewContainer1" class="mb-3" style="text-align:center;">
+                <img id="heroPreview1" src="./assets/images/hero_slide_1.jpg" style="max-height:120px; border-radius:8px; object-fit:cover; border:1px solid var(--color-border);" onerror="this.onerror=null; this.src='./assets/images/hero_slide_1.jpg';">
+              </div>
+              <div class="form-group mb-2">
+                <label>العنوان الرئيسي (Title):</label>
+                <input type="text" id="heroTitle1" placeholder="تشكيلة الخريف والشتاء الحصرية 2026">
+              </div>
+              <div class="form-group mb-2">
+                <label>العنوان الفرعي (Subtitle):</label>
+                <input type="text" id="heroSubtitle1" placeholder="أناقة بلا حدود | DA VINCI STORE">
+              </div>
+              <div class="form-group mb-2">
+                <label>الوصف (Description):</label>
+                <textarea id="heroDesc1" rows="2" style="width:100%; padding:8px; background:var(--color-bg-secondary); border:1px solid var(--color-border); color:#fff; border-radius:6px;"></textarea>
+              </div>
+            </div>
+
+            <!-- Slide 2 -->
+            <div style="background:var(--color-bg-tertiary); padding:18px; border-radius:12px; border:1px solid var(--color-border);">
+              <h4 style="color:var(--color-gold); margin-bottom:12px;"><i class="fa-solid fa-film"></i> الصورة الثانية (الخلفية 2)</h4>
+              <div class="form-group mb-2">
+                <label>رفع صورة من جهازك أو كتابة رابط الصورة:</label>
+                <input type="file" id="heroFile2" accept="image/*" style="margin-bottom:8px; font-size:0.85rem;" onchange="uploadHeroImageFile(2)">
+                <input type="text" id="heroImgUrl2" placeholder="./assets/images/hero_slide_2.jpg">
+              </div>
+              <div id="heroPreviewContainer2" class="mb-3" style="text-align:center;">
+                <img id="heroPreview2" src="./assets/images/hero_slide_2.jpg" style="max-height:120px; border-radius:8px; object-fit:cover; border:1px solid var(--color-border);" onerror="this.onerror=null; this.src='./assets/images/hero_slide_2.jpg';">
+              </div>
+              <div class="form-group mb-2">
+                <label>العنوان الرئيسي (Title):</label>
+                <input type="text" id="heroTitle2" placeholder="أفخم الأحذية المصنوعة يدوياً 2026">
+              </div>
+              <div class="form-group mb-2">
+                <label>العنوان الفرعي (Subtitle):</label>
+                <input type="text" id="heroSubtitle2" placeholder="جلد طبيعي 100% | جودة وتصميم إيطالي">
+              </div>
+              <div class="form-group mb-2">
+                <label>الوصف (Description):</label>
+                <textarea id="heroDesc2" rows="2" style="width:100%; padding:8px; background:var(--color-bg-secondary); border:1px solid var(--color-border); color:#fff; border-radius:6px;"></textarea>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-4">
+            <button type="button" class="btn btn-primary" onclick="saveHeroSliderSettings()">
+              حفظ صور وإعدادات الواجهة <i class="fa-solid fa-save"></i>
+            </button>
+            <span id="heroSliderFeedback" class="feedback-msg"></span>
+          </div>
         </div>
 
         <!-- Announcement Bar Card -->
@@ -155,6 +296,26 @@
               حذف الكل <i class="fa-solid fa-trash"></i>
             </button>
             <span id="announcementFeedback" class="feedback-msg"></span>
+          </div>
+        </div>
+
+        <!-- Store Features (Quick Stats) Card -->
+        <div class="admin-card mb-4">
+          <div class="admin-card-header">
+            <h3 class="admin-card-title"><i class="fa-solid fa-star"></i> مميزات ومزايا المتجر (الشحن، الاسترجاع، الجودة)</h3>
+            <button type="button" class="btn btn-outline" style="padding:4px 12px; font-size:0.8rem; border-color:var(--color-gold); color:var(--color-gold);" onclick="addFeatureRow('', '', 'fa-truck-fast')">
+              <i class="fa-solid fa-plus"></i> إضافة ميزة جديدة
+            </button>
+          </div>
+          <p style="color:var(--color-text-muted); font-size:0.82rem; margin-bottom:15px;">يمكنك تعديل، إضافة، أو حذف المزايا والخدمات التي تظهر في شريط المميزات أسفل السلايدر الرئيسي.</p>
+          <div id="featureRowsContainer" style="display:flex; flex-direction:column; gap:12px;">
+            <!-- Dynamic feature rows populated via JS -->
+          </div>
+          <div class="mt-4">
+            <button type="button" class="btn btn-primary" onclick="saveStoreFeaturesSettings()">
+              حفظ مميزات المتجر <i class="fa-solid fa-save"></i>
+            </button>
+            <span id="featuresFeedback" class="feedback-msg"></span>
           </div>
         </div>
 
@@ -190,6 +351,137 @@
               <span id="settingsFeedback" class="feedback-msg"></span>
             </div>
           </form>
+        </div>
+      </section>
+
+      <!-- Categories Management View -->
+      <section id="categoriesView" class="admin-section" style="display: none;">
+        <div class="section-header">
+          <h2>إدارة فئات التسوق الفاخرة (القطاعات)</h2>
+          <button class="btn btn-primary" onclick="openAddCategoryForm()">
+            إضافة فئة جديدة <i class="fa-solid fa-plus"></i>
+          </button>
+        </div>
+
+        <!-- Category Form Card -->
+        <div id="categoryFormCard" class="admin-card mb-4" style="display: none; background: var(--color-bg-secondary); border: 1px solid var(--color-border-focus); padding: 25px; border-radius: var(--radius-lg);">
+          <h3 id="categoryFormTitle" style="color: var(--color-gold); margin-bottom: 20px;">إضافة فئة جديدة</h3>
+          <form id="categoryAdminForm" onsubmit="handleCategoryFormSubmit(event)">
+            <input type="hidden" id="catEditId">
+            <div class="row">
+              <div class="form-group col-md-6 mb-3">
+                <label>اسم الفئة <span style="color:red">*</span></label>
+                <input type="text" id="catName" required placeholder="مثال: الملابس الراقية">
+              </div>
+              <div class="form-group col-md-6 mb-3">
+                <label>نوع الفئة / المعرّف (Key) <span style="color:red">*</span></label>
+                <select id="catKeySelect" class="form-control mb-2" onchange="handleCatKeySelectChange(this.value)" style="background: var(--color-bg-tertiary); color: #fff; border: 1px solid var(--color-border); padding: 10px; border-radius: var(--radius-sm); width: 100%;">
+                  <option value="">-- اختر الفئة من القائمة --</option>
+                  <option value="clothing" data-name="الملابس الإيطالية الراقية" data-icon="fa-shirt">👔 الملابس الراقية (clothing)</option>
+                  <option value="shoes" data-name="أفخم الأحذية المصنوعة يدوياً" data-icon="fa-shoe-prints">👞 الأحذية الفاخرة (shoes)</option>
+                  <option value="pants" data-name="بناطيل وتصميمات عصرية" data-icon="fa-user-ninja">👖 البناطيل والجينز (pants)</option>
+                  <option value="accessories" data-name="ساعات وإكسسوارات النخبة" data-icon="fa-gem">💎 الساعات والإكسسوارات (accessories)</option>
+                  <option value="suits" data-name="البدل الرسمية والفاخرة" data-icon="fa-user-tie">🧥 البدل الفاخرة (suits)</option>
+                  <option value="perfumes" data-name="العطور الباريسية والشرقية" data-icon="fa-spray-can">✨ العطور الفاخرة (perfumes)</option>
+                  <option value="bags" data-name="الحقائب والمنتجات الجلدية" data-icon="fa-bag-shopping">💼 الحقائب والجلديات (bags)</option>
+                  <option value="glasses" data-name="النظارات الشمسية الفاخرة" data-icon="fa-glasses">🕶️ النظارات الراقية (glasses)</option>
+                  <option value="custom">✏️ أخرى / فئة مخصصة (Custom Key)</option>
+                </select>
+                <input type="text" id="catKeyCustom" class="form-control" style="display: none; background: var(--color-bg-tertiary); color: #fff; border: 1px solid var(--color-border); padding: 10px; border-radius: var(--radius-sm);" placeholder="اكتب رمز الفئة بالإنجليزي (مثال: jackets)" oninput="syncCustomCatKey(this.value)">
+                <input type="hidden" id="catKey" required>
+              </div>
+              <div class="form-group col-md-6 mb-3">
+                <label>أيقونة الفئة (FontAwesome)</label>
+                <input type="text" id="catIcon" placeholder="مثال: fa-shirt أو fa-gem" value="fa-tag">
+              </div>
+              <div class="form-group col-md-6 mb-3">
+                <label>صورة الفئة (رفع ملف أو أدخل رابط)</label>
+                <input type="file" id="catImageFile" accept="image/*" class="form-control mb-2" onchange="previewCatImage(this)">
+                <input type="text" id="catImageUrl" placeholder="أو رابط الصورة (http://... أو ./assets/images/...)">
+              </div>
+            </div>
+            <div id="catPreviewBox" class="mb-3" style="display: none;">
+              <label style="display: block; font-size: 0.85rem; color: var(--color-text-muted); margin-bottom: 6px;">معاينة الصورة المعروضة في سكشن الفئات:</label>
+              <img id="catPreviewImg" src="" alt="معاينة" style="max-height: 120px; border-radius: 10px; border: 1px solid var(--color-border); object-fit: cover;">
+            </div>
+            <div class="mt-3" style="display: flex; gap: 12px; align-items: center;">
+              <button type="submit" class="btn btn-primary">حفظ الفئة <i class="fa-solid fa-floppy-disk"></i></button>
+              <button type="button" class="btn btn-outline" onclick="closeCategoryFormCard()">إلغاء</button>
+              <span id="catFeedback" class="feedback-msg"></span>
+            </div>
+          </form>
+        </div>
+
+        <!-- Categories Table View (Desktop) -->
+        <div class="table-responsive desktop-only-view">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>صورة الكارت</th>
+                <th>اسم الفئة</th>
+                <th>المعرف (Key)</th>
+                <th>الأيقونة</th>
+                <th>إجراءات</th>
+              </tr>
+            </thead>
+            <tbody id="adminCategoriesTableBody">
+              <!-- Populated dynamically via admin.js -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Categories Cards Grid (Mobile View) -->
+        <div class="categories-mobile-grid mobile-only-view" id="adminCategoriesMobileGrid">
+          <!-- Populated dynamically via admin.js -->
+        </div>
+      </section>
+
+      <!-- Comments Management View -->
+      <section id="commentsAdminView" class="admin-section" style="display: none;">
+        <div class="section-header">
+          <h2>إدارة تعليقات العملاء</h2>
+        </div>
+
+        <!-- Comments Settings Control Card -->
+        <div class="admin-card mb-4" style="background: var(--color-bg-tertiary); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: 20px 25px; margin-bottom: 25px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <i class="fa-solid fa-sliders" style="color: var(--color-gold); font-size: 1.4rem;"></i>
+              <div>
+                <h4 style="margin: 0 0 4px 0; color: var(--color-text-primary); font-size: 1.05rem;">إظهار / إخفاء قسم التعليقات في المتجر</h4>
+                <p style="margin: 0; color: var(--color-text-muted); font-size: 0.85rem;">التحكم في ظهور أو إخفاء قسم التعليقات كلياً عن زوار المتجر</p>
+              </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+              <label class="filter-checkbox-container" style="margin: 0; font-size: 0.95rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                <input type="checkbox" id="toggleCommentsVisibility" checked>
+                <span class="checkbox-checkmark"></span>
+                تفعيل ظهور التعليقات في المتجر
+              </label>
+              <button type="button" class="btn btn-primary" id="saveCommentsVisibilityBtn" onclick="saveCommentsVisibilitySettings()">
+                حفظ التغييرات <i class="fa-solid fa-floppy-disk"></i>
+              </button>
+              <span id="commentsVisibilityFeedback" class="feedback-msg"></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Comments Table -->
+        <div class="table-responsive">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>العميل</th>
+                <th>التقييم</th>
+                <th>التعليق والتجربة</th>
+                <th>التاريخ</th>
+                <th>إجراءات</th>
+              </tr>
+            </thead>
+            <tbody id="adminCommentsTableBody">
+              <!-- Populated dynamically via admin.js -->
+            </tbody>
+          </table>
         </div>
       </section>
 
@@ -371,6 +663,34 @@
     </div>
   </div>
 
+  <!-- Category Form Modal -->
+  <div class="modal" id="categoryModal">
+    <div class="modal-backdrop" onclick="closeCategoryModal()"></div>
+    <div class="checkout-modal-content" style="max-width: 480px;">
+      <button class="close-modal-btn" onclick="closeCategoryModal()"><i class="fa-solid fa-xmark"></i></button>
+      <h3 class="checkout-step-title" id="categoryModalTitle">إضافة فئة جديدة</h3>
+      <form id="categoryForm">
+        <input type="hidden" id="catId">
+        <div class="form-group mb-3">
+          <label>معرّف الفئة (Key - بالإنجليزية بدون مسافات) *</label>
+          <input type="text" id="catKey" required placeholder="مثال: suits, watches, shirts">
+          <small style="color:var(--color-text-muted); font-size:0.75rem;">يُستخدم في ربط المنتجات والفلترة (مثال: suits)</small>
+        </div>
+        <div class="form-group mb-3">
+          <label>اسم الفئة للعرض (بالعربية) *</label>
+          <input type="text" id="catName" required placeholder="مثال: البدلات الإيطالية الراقية">
+        </div>
+        <div class="form-group mb-3">
+          <label>أيقونة الفئة (FontAwesome Class) *</label>
+          <input type="text" id="catIcon" value="fa-tag" required placeholder="مثال: fa-shirt, fa-gem, fa-crown">
+        </div>
+        <div class="mt-4">
+          <button type="submit" class="btn btn-primary w-100">حفظ الفئة <i class="fa-solid fa-save"></i></button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- Order Details Modal -->
   <div class="modal" id="orderModal">
     <div class="modal-backdrop" onclick="closeOrderModal()"></div>
@@ -418,8 +738,10 @@
     </div>
   </div>
 
+
+
   <!-- HTML2PDF CDN library -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-  <script src="./admin.js"></script>
+  <script src="./admin.js?v=20260920_v3"></script>
 </body>
 </html>
