@@ -243,6 +243,116 @@ function initDb() {
         db.run("ALTER TABLE products ADD COLUMN reviews_count INTEGER", () => {});
         db.run("ALTER TABLE products ADD COLUMN in_stock INTEGER DEFAULT 1", () => {});
         db.run("ALTER TABLE products ADD COLUMN featured INTEGER DEFAULT 0", () => {});
+
+        db.get("SELECT COUNT(*) as count FROM products", [], (err, row) => {
+            if (!row || row.count !== 0) return;
+            const defaultProducts = [
+                {
+                    name: "حذاء ألترامكس الذهبي الفاخر",
+                    category: "shoes",
+                    category_name: "أحذية",
+                    price: 4900,
+                    old_price: 6200,
+                    rating: 4.9,
+                    reviews_count: 128,
+                    image: "./assets/images/shoes_ultramax_gold.jpg",
+                    images: JSON.stringify(["./assets/images/shoes_ultramax_gold.jpg"]),
+                    description: "حذاء رياضي يجمع بين الفخامة والراحة المتناهية. يتميز بنعل أوسط مبطن بتقنية متطورة لامتصاص الصدمات وتفاصيل ذهبية تعكس الرقي.",
+                    sizes: JSON.stringify([40, 41, 42, 43, 44, 45]),
+                    colors: JSON.stringify([
+                        { name: "أسود ذهبي", code: "#1a1a1a", secondary: "#D4AF37" },
+                        { name: "أبيض ذهبي", code: "#ffffff", secondary: "#D4AF37" }
+                    ]),
+                    in_stock: 1,
+                    featured: 1
+                },
+                {
+                    name: "حذاء رويال جلدي كلاسيكي",
+                    category: "shoes",
+                    category_name: "أحذية",
+                    price: 5800,
+                    old_price: null,
+                    rating: 4.8,
+                    reviews_count: 84,
+                    image: "./assets/images/shoes_royal_classic.jpg",
+                    images: JSON.stringify(["./assets/images/shoes_royal_classic.jpg"]),
+                    description: "حذاء رسمي مصنوع يدويًا من جلد العجل الطبيعي 100%. تصميم إيطالي كلاسيكي يضفي لمسة من الأناقة والجاذبية على إطلالتك الرسمية.",
+                    sizes: JSON.stringify([39, 40, 41, 42, 43, 44]),
+                    colors: JSON.stringify([
+                        { name: "بني داكن", code: "#5C4033", secondary: "#5C4033" },
+                        { name: "أسود ملكي", code: "#000000", secondary: "#000000" }
+                    ]),
+                    in_stock: 1,
+                    featured: 1
+                },
+                {
+                    name: "حذاء نيو-ستريت العصري",
+                    category: "shoes",
+                    category_name: "أحذية",
+                    price: 3200,
+                    old_price: 3800,
+                    rating: 4.6,
+                    reviews_count: 62,
+                    image: "./assets/images/shoes_new_street.jpg",
+                    images: JSON.stringify(["./assets/images/shoes_new_street.jpg"]),
+                    description: "حذاء كاجوال بتصميم عصري جريء ومريح للمشي اليومي. يتميز بجزء علوي من نسيج يسمح بالتهوية ونعل مطاطي متين ومرن.",
+                    sizes: JSON.stringify([40, 41, 42, 43, 44]),
+                    colors: JSON.stringify([
+                        { name: "رمادي بلمسات برتقالية", code: "#808080", secondary: "#FF5733" },
+                        { name: "أزرق داكن", code: "#000080", secondary: "#ffffff" }
+                    ]),
+                    in_stock: 1,
+                    featured: 0
+                },
+                {
+                    name: "سترة جلدية 'ستيلث' الفخمة",
+                    category: "clothing",
+                    category_name: "ملابس",
+                    price: 7900,
+                    old_price: 9500,
+                    rating: 5.0,
+                    reviews_count: 45,
+                    image: "./assets/images/cloth_stealth_leather.jpg",
+                    images: JSON.stringify(["./assets/images/cloth_stealth_leather.jpg"]),
+                    description: "جاكيت جلد طبيعي فاخر بتصميم عصري مميز وقصة مثالية. يمنحك الدفء والمظهر الجذاب والقوي في آن واحد.",
+                    sizes: JSON.stringify(["S", "M", "L", "XL", "XXL"]),
+                    colors: JSON.stringify([
+                        { name: "أسود مطفي", code: "#1a1a1a", secondary: "#1a1a1a" },
+                        { name: "بني عتيق", code: "#3d2314", secondary: "#3d2314" }
+                    ]),
+                    in_stock: 1,
+                    featured: 1
+                },
+                {
+                    name: "كنزة صوفية أوفرسايز بيج",
+                    category: "clothing",
+                    category_name: "ملابس",
+                    price: 1850,
+                    old_price: 2400,
+                    rating: 4.7,
+                    reviews_count: 92,
+                    image: "./assets/images/cloth_oversize_beige.jpg",
+                    images: JSON.stringify(["./assets/images/cloth_oversize_beige.jpg"]),
+                    description: "كنزة صوفية بتصميم أوفرسايز مريح للغاية، مصنوعة من قطن مصري فاخر ومبطنة بطبقة ناعمة لتوفر دفئاً ممتازاً.",
+                    sizes: JSON.stringify(["M", "L", "XL", "XXL"]),
+                    colors: JSON.stringify([
+                        { name: "بيج كريمي", code: "#f5ebe0", secondary: "#f5ebe0" },
+                        { name: "أسود داكن", code: "#0a0a0a", secondary: "#0a0a0a" }
+                    ]),
+                    in_stock: 1,
+                    featured: 1
+                }
+            ];
+            const stmt = db.prepare(`INSERT INTO products 
+                (name, category, category_name, price, old_price, rating, reviews_count, image, images, description, sizes, colors, in_stock, featured)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+            defaultProducts.forEach(p => stmt.run(
+                p.name, p.category, p.category_name, p.price, p.old_price, p.rating, p.reviews_count,
+                p.image, p.images, p.description, p.sizes, p.colors, p.in_stock, p.featured
+            ));
+            stmt.finalize();
+            console.log("[DB] Default products seeded into database.");
+        });
     });
 
     // 3. orders
