@@ -42,19 +42,27 @@ let cloudinaryReady = false;
 
 if (process.env.CLOUDINARY_URL) {
     try {
-        // Parse the URL manually — avoids SDK version quirks
-        const cUrl = process.env.CLOUDINARY_URL.replace('cloudinary://', 'http://');
-        const parsed = new URL(cUrl);
         cloudinary.config({
-            cloud_name: parsed.hostname,
-            api_key:    parsed.username,
-            api_secret: decodeURIComponent(parsed.password),
-            secure:     true
+            cloudinary_url: process.env.CLOUDINARY_URL,
+            secure: true
         });
         cloudinaryReady = true;
-        console.log(`[Cloudinary] Configured via CLOUDINARY_URL — cloud: ${parsed.hostname}`);
+        console.log(`[Cloudinary] Configured via CLOUDINARY_URL`);
     } catch (e) {
-        console.error('[Cloudinary] Failed to parse CLOUDINARY_URL:', e.message);
+        try {
+            const cUrl = process.env.CLOUDINARY_URL.replace('cloudinary://', 'http://');
+            const parsed = new URL(cUrl);
+            cloudinary.config({
+                cloud_name: parsed.hostname,
+                api_key:    parsed.username,
+                api_secret: decodeURIComponent(parsed.password),
+                secure:     true
+            });
+            cloudinaryReady = true;
+            console.log(`[Cloudinary] Configured via CLOUDINARY_URL fallback — cloud: ${parsed.hostname}`);
+        } catch (e2) {
+            console.error('[Cloudinary] Failed to parse CLOUDINARY_URL:', e2.message);
+        }
     }
 } else if (
     process.env.CLOUDINARY_CLOUD_NAME &&
