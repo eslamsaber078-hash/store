@@ -273,6 +273,7 @@ img {
   flex: 1;
   overflow: hidden;
   min-width: 0;
+  direction: ltr; /* Isolate from page RTL so animation scrolls correctly */
   mask-image: linear-gradient(to right, transparent 0%, black 6%, black 94%, transparent 100%);
   -webkit-mask-image: linear-gradient(to right, transparent 0%, black 6%, black 94%, transparent 100%);
 }
@@ -283,6 +284,7 @@ img {
   width: max-content;
   will-change: transform;
   animation: tickerScroll 28s linear infinite;
+  direction: rtl; /* Restore RTL for text rendering inside items */
 }
 .announcement-track:hover {
   animation-play-state: paused;
