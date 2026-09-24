@@ -93,7 +93,30 @@ document.addEventListener('DOMContentLoaded', () => {
         showLogin();
     }
     initColorWidgets();
+    loadPublicTheme();
 });
+
+// Applies the saved theme (color + mode) on page load, before login as well.
+// GET /api/settings is public, so the login screen shows the store's theme.
+async function loadPublicTheme() {
+    try {
+        const res = await fetch(`${API_URL}/settings`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.theme_color) {
+            applyThemeColor(data.theme_color);
+            updateThemeColorInput(data.theme_color);
+        }
+        if (data.theme_mode) {
+            localStorage.setItem('theme_mode', data.theme_mode);
+            applyThemeMode(data.theme_mode);
+        }
+    } catch (e) {
+        // Fall back to locally remembered theme if the API is unreachable
+        const cachedMode = localStorage.getItem('theme_mode');
+        if (cachedMode) applyThemeMode(cachedMode);
+    }
+}
 
 // ===== Color Picker Widgets =====
 function initColorWidgets() {
@@ -293,6 +316,8 @@ accountForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const newUsername = document.getElementById('accUsername').value;
     const newPassword = document.getElementById('accPassword').value;
+    const currentPassword = document.getElementById('accCurrentPassword').value;
+    const feedback = document.getElementById('accountFeedback');
     
     try {
         const res = await fetch(`${API_URL}/auth/update`, {
@@ -301,16 +326,17 @@ accountForm.addEventListener('submit', async (e) => {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${authToken}`
             },
-            body: JSON.stringify({ newUsername, newPassword: newPassword || undefined })
+            body: JSON.stringify({ newUsername, newPassword: newPassword || undefined, currentPassword })
         });
         const data = await res.json();
         
         if (res.ok) {
-            document.getElementById('accountFeedback').textContent = 'تم تحديث بيانات الدخول بنجاح. قد تحتاج لتسجيل الدخول مجدداً.';
+            feedback.style.color = '';
+            feedback.textContent = 'تم تحديث بيانات الدخول بنجاح. قد تحتاج لتسجيل الدخول مجدداً.';
             setTimeout(() => { logoutBtn.click(); }, 3000);
         } else {
-            document.getElementById('accountFeedback').textContent = data.error || 'حدث خطأ';
-            document.getElementById('accountFeedback').style.color = 'var(--color-danger)';
+            feedback.textContent = data.error || 'حدث خطأ';
+            feedback.style.color = 'var(--color-danger)';
         }
     } catch (err) {
         console.error(err);

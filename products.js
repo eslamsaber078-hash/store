@@ -1,4 +1,4 @@
-const products = [
+window.products = [
   // --- Category: shoes (أحذية) ---
   {
     id: "shoes-1",

@@ -157,6 +157,8 @@ function initSqlite() {
         });
     } catch(e) {
         console.error("[DB] sqlite3 native module load error:", e.message);
+        console.error("[DB] No DATABASE_URL configured either — the server cannot serve data. Exiting.");
+        process.exit(1);
     }
 }
 
@@ -164,12 +166,19 @@ const connectionString = process.env.DATABASE_URL;
 
 if (connectionString) {
     console.log("[DB] DATABASE_URL provided. Connecting to PostgreSQL...");
+    // Render's free Postgres plan allows only 5 concurrent connections,
+    // while pg's default is 10. PG_POOL_MAX lets you raise it on paid plans.
+    const poolMax = parseInt(process.env.PG_POOL_MAX, 10) || 5;
     pgPool = new Pool({
         connectionString,
+        max: poolMax,
+        idleTimeoutMillis: 30000,      // recycle idle connections quickly
+        connectionTimeoutMillis: 10000, // fail fast instead of hanging under load
         ssl: !connectionString.includes('localhost') && !connectionString.includes('127.0.0.1')
             ? { rejectUnauthorized: false }
             : false
     });
+    console.log(`[DB] Pool size: ${poolMax} connections`);
 
     pgPool.connect((err, client, release) => {
         if (err) {

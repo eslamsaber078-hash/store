@@ -7,7 +7,7 @@
   
   <!-- Favicon -->
   <link rel="icon" type="image/svg+xml" href="./favicon.svg">
-  <link rel="alternate icon" href="./favicon.ico">
+  <link rel="alternate icon" href="./favicon.svg">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -493,12 +493,16 @@
         <div class="admin-card">
           <form id="accountForm">
             <div class="form-group mb-3">
+              <label>كلمة المرور الحالية (مطلوبة)</label>
+              <input type="password" id="accCurrentPassword" required autocomplete="current-password">
+            </div>
+            <div class="form-group mb-3">
               <label>اسم المستخدم الجديد</label>
               <input type="text" id="accUsername" required>
             </div>
             <div class="form-group mb-3">
               <label>كلمة المرور الجديدة (اختياري)</label>
-              <input type="password" id="accPassword" placeholder="اتركه فارغاً لعدم التغيير">
+              <input type="password" id="accPassword" placeholder="اتركه فارغاً لعدم التغيير" autocomplete="new-password">
             </div>
             <div class="mt-4">
               <button type="submit" class="btn btn-primary">تحديث بيانات الدخول <i class="fa-solid fa-user-pen"></i></button>
@@ -663,35 +667,8 @@
     </div>
   </div>
 
-  <!-- Category Form Modal -->
-  <div class="modal" id="categoryModal">
-    <div class="modal-backdrop" onclick="closeCategoryModal()"></div>
-    <div class="checkout-modal-content" style="max-width: 480px;">
-      <button class="close-modal-btn" onclick="closeCategoryModal()"><i class="fa-solid fa-xmark"></i></button>
-      <h3 class="checkout-step-title" id="categoryModalTitle">إضافة فئة جديدة</h3>
-      <form id="categoryForm">
-        <input type="hidden" id="catId">
-        <div class="form-group mb-3">
-          <label>معرّف الفئة (Key - بالإنجليزية بدون مسافات) *</label>
-          <input type="text" id="catKey" required placeholder="مثال: suits, watches, shirts">
-          <small style="color:var(--color-text-muted); font-size:0.75rem;">يُستخدم في ربط المنتجات والفلترة (مثال: suits)</small>
-        </div>
-        <div class="form-group mb-3">
-          <label>اسم الفئة للعرض (بالعربية) *</label>
-          <input type="text" id="catName" required placeholder="مثال: البدلات الإيطالية الراقية">
-        </div>
-        <div class="form-group mb-3">
-          <label>أيقونة الفئة (FontAwesome Class) *</label>
-          <input type="text" id="catIcon" value="fa-tag" required placeholder="مثال: fa-shirt, fa-gem, fa-crown">
-        </div>
-        <div class="mt-4">
-          <button type="submit" class="btn btn-primary w-100">حفظ الفئة <i class="fa-solid fa-save"></i></button>
-        </div>
-      </form>
-    </div>
-  </div>
+  <!-- Category form is managed inside the inline card (#categoryFormCard) -->
 
-  <!-- Order Details Modal -->
   <div class="modal" id="orderModal">
     <div class="modal-backdrop" onclick="closeOrderModal()"></div>
     <div class="checkout-modal-content">

@@ -2125,26 +2125,35 @@ document.addEventListener("DOMContentLoaded", () => {
           const data = await res.json();
           if (res.ok) {
               elements.coSuccessOrderNum.innerText = data.orderNumber;
+              closeCheckout();
+
+              // Clear Cart state completely — only on success
+              cart = [];
+              localStorage.removeItem("davinci_store_cart");
+              updateCartUI();
+
+              // Trigger Confetti and success modal
+              triggerConfetti();
+              elements.successModal.classList.add("active");
+              document.body.style.overflow = "hidden";
           } else {
-              elements.coSuccessOrderNum.innerText = `VL-FAILED-${Math.floor(Math.random()*1000)}`;
-              console.error("Order failed:", data.error);
+              closeCheckout();
+              const msg = data.error || "تعذر إتمام الطلب، حاول مرة أخرى";
+              if (typeof showToastNotification === 'function') {
+                  showToastNotification(msg);
+              } else {
+                  alert(msg);
+              }
           }
       } catch(err) {
-          elements.coSuccessOrderNum.innerText = `VL-OFFLINE-${Math.floor(Math.random()*1000)}`;
           console.error("Order request error:", err);
+          closeCheckout();
+          if (typeof showToastNotification === 'function') {
+              showToastNotification("تعذر الاتصال بالخادم، تحقق من اتصالك وحاول مرة أخرى");
+          } else {
+              alert("تعذر الاتصال بالخادم، تحقق من اتصالك وحاول مرة أخرى");
+          }
       }
-
-      closeCheckout();
-      
-      // Clear Cart state completely
-      cart = [];
-      localStorage.removeItem("davinci_store_cart");
-      updateCartUI();
-
-      // Trigger Confetti and success modal
-      triggerConfetti();
-      elements.successModal.classList.add("active");
-      document.body.style.overflow = "hidden";
     }
 
     // Interactive payment gate generator
@@ -2397,9 +2406,11 @@ document.addEventListener("DOMContentLoaded", () => {
           subtotal: subtotal,
           discount: discount,
           total: total,
+          promo_code: currentPromo ? currentPromo.code : undefined,
           items: cart.map(item => {
               const p = products.find(prod => String(prod.id) === String(item.productId));
               return {
+                  product_id: item.productId,
                   name: p ? p.name : 'منتج غير معروف',
                   quantity: item.quantity,
                   price: p ? p.price : 0,

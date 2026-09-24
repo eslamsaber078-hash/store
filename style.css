@@ -449,6 +449,17 @@ img {
   font-size: 0.85rem;
   width: 100%;
   color: var(--color-text-primary);
+  background: transparent;
+  border: none;
+  outline: none;
+  box-shadow: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.search-wrapper input:focus {
+  border: none;
+  outline: none;
+  box-shadow: none;
 }
 .search-wrapper input::placeholder {
   color: var(--color-text-muted);
@@ -461,6 +472,33 @@ img {
 }
 .search-close-btn {
   display: none;
+}
+
+/* ─── Desktop search field (>=993px): integrated, aligned with control icons ─── */
+@media (min-width: 993px) {
+  .search-wrapper {
+    height: 42px;
+    padding: 0 6px 0 16px;
+    background: rgba(255, 255, 255, 0.04);
+    box-sizing: border-box;
+  }
+  .search-wrapper input {
+    padding: 0 6px;
+  }
+  .search-wrapper #searchBtn {
+    width: 32px;
+    height: 32px;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    font-size: 1rem;
+    flex-shrink: 0;
+  }
+  .search-wrapper #searchBtn:hover {
+    background: rgba(212, 175, 55, 0.12);
+    border: none;
+    transform: none;
+  }
 }
 
 /* ─── Search Suggestions Dropdown ─────────────────────────────────────────── */
@@ -812,6 +850,7 @@ img {
   margin-bottom: 20px;
   display: block;
   text-transform: uppercase;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
 }
 .slide-title {
   font-size: 3.8rem;
@@ -820,12 +859,14 @@ img {
   margin-bottom: 25px;
   color: #fff;
   letter-spacing: -1px;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.7), 0 0 30px rgba(0, 0, 0, 0.4);
 }
 .slide-desc {
   font-size: 1.1rem;
-  color: var(--color-text-secondary);
+  color: rgba(255, 255, 255, 0.92);
   margin-bottom: 40px;
   max-width: 550px;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.6);
 }
 .slide-actions {
   display: flex;
@@ -976,7 +1017,7 @@ img {
   left: 0;
   width: 100%;
   height: 100%;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.9) 10%, rgba(0, 0, 0, 0.1) 60%);
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.92) 5%, rgba(0, 0, 0, 0.55) 40%, rgba(0, 0, 0, 0.15) 70%);
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
@@ -988,6 +1029,7 @@ img {
   font-weight: 700;
   color: #fff;
   margin-bottom: 10px;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.8), 0 0 20px rgba(0, 0, 0, 0.5);
 }
 .category-link {
   color: var(--color-gold);
@@ -999,12 +1041,13 @@ img {
   transform: translateY(15px);
   opacity: 0;
   transition: all var(--transition-normal);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
 }
 .category-card:hover img {
   transform: scale(1.1);
 }
 .category-card:hover .category-overlay {
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.95) 20%, rgba(0, 0, 0, 0.2) 65%);
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.97) 15%, rgba(0, 0, 0, 0.6) 50%, rgba(0, 0, 0, 0.2) 75%);
 }
 .category-card:hover .category-link {
   transform: translateY(0);
@@ -2831,6 +2874,43 @@ img {
     justify-content: space-between;
   }
 
+  /* ─── Responsive Header: keep logo prominent, tighten controls ─── */
+  .navbar-container {
+    padding: 12px 14px;
+  }
+  .navbar-inner {
+    gap: 10px;
+  }
+  .brand-logo {
+    letter-spacing: 1.5px;
+  }
+  .logo-accent {
+    font-size: 1.4rem;
+  }
+  .logo-main {
+    font-size: 1.05rem;
+    letter-spacing: 1.5px;
+    margin-right: 5px;
+  }
+  .navbar-controls {
+    gap: 8px;
+  }
+  .control-btn {
+    width: 38px;
+    height: 38px;
+    font-size: 1rem;
+  }
+  .search-wrapper {
+    width: 38px;
+    height: 38px;
+    max-width: 38px;
+    flex-shrink: 0;
+  }
+  .search-wrapper #searchBtn {
+    width: 36px;
+    height: 36px;
+  }
+
   .quickview-grid {
     grid-template-columns: 1fr;
     gap: 25px;
@@ -2977,21 +3057,41 @@ img {
     width: 100%;
     justify-content: space-between;
   }
-  /* Navbar controls spacing */
+  /* Navbar controls spacing — very small screens */
+  .navbar-container {
+    padding: 10px;
+  }
+  .navbar-inner {
+    gap: 6px;
+  }
   .navbar-controls {
-    gap: 8px;
+    gap: 4px;
   }
   .control-btn {
-    width: 36px;
-    height: 36px;
-    font-size: 0.95rem;
+    width: 32px;
+    height: 32px;
+    font-size: 0.9rem;
+  }
+  .search-wrapper {
+    width: 32px;
+    height: 32px;
+    max-width: 32px;
+  }
+  .search-wrapper #searchBtn {
+    width: 30px;
+    height: 30px;
   }
   /* Brand logo font size */
+  .brand-logo {
+    letter-spacing: 1px;
+  }
   .logo-accent {
-    font-size: 1.1rem;
+    font-size: 1.2rem;
   }
   .logo-main {
-    font-size: 0.85rem;
+    font-size: 0.92rem;
+    letter-spacing: 1px;
+    margin-right: 5px;
   }
   /* Cart/Wishlist drawer header */
   .drawer-header h3 {
@@ -3959,15 +4059,33 @@ body[data-theme="light"] .control-btn:hover {
   border-color: var(--color-gold) !important;
 }
 
-/* Search box */
-html[data-theme="light"] .search-container,
-body[data-theme="light"] .search-container {
-  background: rgba(255, 255, 255, 0.95) !important;
-  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+/* Search field (light mode) */
+html[data-theme="light"] .search-wrapper,
+body[data-theme="light"] .search-wrapper,
+body.light-mode .search-wrapper {
+  background: #ffffff !important;
+  border: 1px solid rgba(0, 0, 0, 0.14) !important;
 }
-html[data-theme="light"] .search-input,
-body[data-theme="light"] .search-input {
+html[data-theme="light"] .search-wrapper:focus-within,
+body[data-theme="light"] .search-wrapper:focus-within,
+body.light-mode .search-wrapper:focus-within {
+  border-color: var(--color-gold) !important;
+  background: #ffffff !important;
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.18) !important;
+}
+html[data-theme="light"] .search-wrapper input,
+body[data-theme="light"] .search-wrapper input,
+body.light-mode .search-wrapper input {
   color: #1a1d20 !important;
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+html[data-theme="light"] .search-wrapper input::placeholder,
+body[data-theme="light"] .search-wrapper input::placeholder,
+body.light-mode .search-wrapper input::placeholder {
+  color: #9aa0a6 !important;
 }
 html[data-theme="light"] .search-suggestions,
 body[data-theme="light"] .search-suggestions {
@@ -4025,4 +4143,45 @@ body[data-theme="light"] .product-price {
 html[data-theme="light"] .comment-date,
 body[data-theme="light"] .comment-date {
   color: #6c757d !important;
+}
+
+/* ══════════════════════════════════════════════════════
+   HEADER — extra-narrow phones (<=350px: e.g. 320px legacy, Galaxy Fold)
+   Keeps the navbar on one line with no horizontal overflow.
+   ══════════════════════════════════════════════════════ */
+@media (max-width: 350px) {
+  .navbar-container {
+    padding: 8px;
+  }
+  .navbar-inner {
+    gap: 5px;
+  }
+  .navbar-controls {
+    gap: 3px;
+  }
+  .control-btn {
+    width: 28px;
+    height: 28px;
+    font-size: 0.8rem;
+  }
+  .search-wrapper {
+    width: 28px;
+    height: 28px;
+    max-width: 28px;
+  }
+  .search-wrapper #searchBtn {
+    width: 26px;
+    height: 26px;
+  }
+  .brand-logo {
+    letter-spacing: 0.5px;
+  }
+  .logo-accent {
+    font-size: 1rem;
+  }
+  .logo-main {
+    font-size: 0.78rem;
+    letter-spacing: 0.5px;
+    margin-right: 5px;
+  }
 }
