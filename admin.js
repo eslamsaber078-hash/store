@@ -3,6 +3,37 @@ const API_URL = (window.location.hostname === 'localhost' || window.location.hos
     : window.location.origin + '/api';
 let authToken = localStorage.getItem('adminToken') || localStorage.getItem('authToken') || null;
 
+// ─── Scroll lock (mobile / iOS safe) ──────────────────────────────────────
+// body{overflow:hidden} is ignored by iOS Safari, so the body is pinned with
+// position:fixed at its current offset. State is derived from the DOM so that
+// stacked overlays can never leak a stuck lock or unlock too early.
+let adminScrollLocked = false;
+let adminScrollLockY = 0;
+
+function updateAdminScrollLock() {
+    const overlayOpen = !!document.querySelector(
+        ".modal.active, .admin-sidebar.active, .checkout-modal.active"
+    );
+
+    if (overlayOpen && !adminScrollLocked) {
+        adminScrollLockY = window.scrollY || window.pageYOffset || 0;
+        document.body.classList.add("modal-open");
+        document.body.style.top = `-${adminScrollLockY}px`;
+        adminScrollLocked = true;
+    } else if (!overlayOpen && adminScrollLocked) {
+        document.body.classList.remove("modal-open");
+        document.body.style.top = "";
+        adminScrollLocked = false;
+        // Force a reflow so the document regains its height before scrollTo lands.
+        void document.body.offsetHeight;
+        const html = document.documentElement;
+        const prev = html.style.scrollBehavior;
+        html.style.scrollBehavior = "auto";
+        window.scrollTo(0, adminScrollLockY);
+        html.style.scrollBehavior = prev;
+    }
+}
+
 // ─── Session Timeout (10 minutes inactivity auto-logout) ──────────────────
 const SESSION_TIMEOUT_MS  = 10 * 60 * 1000;   // 10 minutes
 const SESSION_WARNING_MS  = 60 * 1000;         // warn 60 s before
@@ -675,9 +706,11 @@ function openProductModal() {
     setColorWidget(2, null);
     document.getElementById('productModalTitle').textContent = 'إضافة منتج جديد';
     modal.classList.add('active');
+    updateAdminScrollLock();
 }
 function closeProductModal() {
     modal.classList.remove('active');
+    updateAdminScrollLock();
 }
 
 function editProduct(id) {
@@ -705,6 +738,7 @@ function editProduct(id) {
     
     document.getElementById('productModalTitle').textContent = 'تعديل المنتج';
     modal.classList.add('active');
+    updateAdminScrollLock();
 }
 
 productForm.addEventListener('submit', async (e) => {
@@ -1157,6 +1191,7 @@ function viewOrder(id) {
     });
     
     oModal.classList.add('active');
+    updateAdminScrollLock();
 }
 
 // Bind update order status button
@@ -1191,6 +1226,7 @@ if (updateStatusBtn) {
 
 function closeOrderModal() {
     oModal.classList.remove('active');
+    updateAdminScrollLock();
 }
 
 // ── Mobile Sidebar Toggle Handler ──────────────────────────
@@ -1202,12 +1238,12 @@ document.addEventListener('DOMContentLoaded', () => {
     function openSidebar() {
         sidebar.classList.add('active');
         if (backdrop) backdrop.classList.add('active');
-        document.body.style.overflow = 'hidden';
+        updateAdminScrollLock();
     }
     function closeSidebar() {
         sidebar.classList.remove('active');
         if (backdrop) backdrop.classList.remove('active');
-        document.body.style.overflow = '';
+        updateAdminScrollLock();
     }
 
     if (sidebarToggle && sidebar) {

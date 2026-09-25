@@ -23,6 +23,51 @@ document.addEventListener("DOMContentLoaded", () => {
   let activeSlide = 0;
   let slideInterval = null;
 
+  // --- SCROLL LOCK (mobile / iOS safe) ---
+  // iOS Safari ignores body{overflow:hidden}, so the body is pinned with
+  // position:fixed at its current offset and restored once every overlay closes.
+  // The state is derived from the DOM (not counted) because drawers replace each
+  // other directly (quick view -> cart), which would leak a naive counter.
+  let scrollLocked = false;
+  let scrollLockY = 0;
+  let lastKnownScrollY = 0;
+
+  function restoreScrollPosition(y) {
+    // html{scroll-behavior:smooth} would animate the restore, so force an instant jump.
+    const html = document.documentElement;
+    const prevBehavior = html.style.scrollBehavior;
+    html.style.scrollBehavior = "auto";
+    window.scrollTo(0, y);
+    html.style.scrollBehavior = prevBehavior;
+  }
+
+  function updateScrollLock() {
+    const overlayOpen = !!document.querySelector(
+      ".modal.active, .cart-drawer.active, .mobile-drawer.active, .shop-sidebar-filter.active"
+    );
+
+    if (overlayOpen && !scrollLocked) {
+      // While pinned, window.scrollY reads 0 — fall back to the last real offset.
+      scrollLockY = window.scrollY || lastKnownScrollY || 0;
+      document.body.classList.add("modal-open");
+      document.body.style.top = `-${scrollLockY}px`;
+      scrollLocked = true;
+    } else if (!overlayOpen && scrollLocked) {
+      document.body.classList.remove("modal-open");
+      document.body.style.top = "";
+      scrollLocked = false;
+      // Reading the height forces a reflow: the document must regain its full
+      // scrollable height before scrollTo can actually land.
+      void document.body.offsetHeight;
+      restoreScrollPosition(scrollLockY);
+      lastKnownScrollY = scrollLockY;
+    }
+  }
+
+  window.addEventListener("scroll", () => {
+    if (!scrollLocked) lastKnownScrollY = window.scrollY || window.pageYOffset || 0;
+  }, { passive: true });
+
   // Selected specs for Quick View
   let qvSelectedProduct = null;
   let qvSelectedSize = null;
@@ -1048,7 +1093,7 @@ document.addEventListener("DOMContentLoaded", () => {
             <h4 class="cart-item-name">${prod.name}</h4>
             <span class="cart-item-price">${formatPrice(prod.price)}</span>
             <div style="margin-top: 10px; display: flex; gap: 8px;">
-              <button class="btn btn-primary" style="padding: 6px 12px; font-size: 0.75rem; border-radius: var(--radius-sm);" onclick="window.vogueQuickAddToCart(${prod.id}); elements.wishlistDrawer.classList.remove('active'); elements.drawerOverlay.classList.remove('active');">
+              <button class="btn btn-primary" style="padding: 6px 12px; font-size: 0.75rem; border-radius: var(--radius-sm);" onclick="window.vogueQuickAddToCart(${prod.id}); if (window.vogueCloseDrawers) window.vogueCloseDrawers();">
                 <i class="fa-solid fa-cart-plus"></i> شراء سريع
               </button>
               <button class="btn btn-outline" style="padding: 6px 10px; font-size: 0.75rem; border-radius: var(--radius-sm); color: var(--color-danger); border-color: var(--color-danger);" onclick="window.vogueToggleWishlist(${prod.id})">
@@ -1193,12 +1238,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Show modal
     elements.quickViewModal.classList.add("active");
-    document.body.style.overflow = "hidden"; // disable body scrolling
+    updateScrollLock();
   };
 
   function closeQuickView() {
     elements.quickViewModal.classList.remove("active");
-    document.body.style.overflow = "auto";
+    updateScrollLock();
   }
 
   // --- CHECKOUT WIZARD PROCESS ---
@@ -1460,7 +1505,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const openDrawerElement = (el) => {
       if (!el) return;
       const currentActives = document.querySelectorAll(
-        ".cart-drawer.active, .wishlist-drawer.active, .mobile-drawer.active, .filter-sidebar.active, .modal.active, .checkout-modal.active, .success-modal.active, .payment-gate-modal.active"
+        ".cart-drawer.active, .mobile-drawer.active, .shop-sidebar-filter.active, .modal.active, .checkout-modal.active, .success-modal.active, .payment-gate-modal.active"
       );
       currentActives.forEach(item => {
         if (item !== el) item.classList.remove("active");
@@ -1468,7 +1513,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       el.classList.add("active");
       if (elements.drawerOverlay) elements.drawerOverlay.classList.add("active");
-      document.body.style.overflow = "hidden";
+      updateScrollLock();
       if (!isHistoryPushed) {
         pushModalHistory();
       }
@@ -1476,11 +1521,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const closeDrawers = (fromPopstate = false) => {
       const activeElements = document.querySelectorAll(
-        ".cart-drawer.active, .wishlist-drawer.active, .mobile-drawer.active, .filter-sidebar.active, .modal.active, .checkout-modal.active, .success-modal.active, .payment-gate-modal.active, .drawer-overlay.active"
+        ".cart-drawer.active, .mobile-drawer.active, .shop-sidebar-filter.active, .modal.active, .checkout-modal.active, .success-modal.active, .payment-gate-modal.active, .drawer-overlay.active"
       );
 
       activeElements.forEach(el => el.classList.remove("active"));
-      document.body.style.overflow = "";
+      updateScrollLock();
 
       if (isHistoryPushed) {
         isHistoryPushed = false;
@@ -2002,11 +2047,11 @@ document.addEventListener("DOMContentLoaded", () => {
     // Modal Close operations
     elements.closeQuickViewBtn.addEventListener("click", () => {
       elements.quickViewModal.classList.remove("active");
-      document.body.style.overflow = "";
+      updateScrollLock();
     });
     elements.quickViewBackdrop.addEventListener("click", () => {
       elements.quickViewModal.classList.remove("active");
-      document.body.style.overflow = "";
+      updateScrollLock();
     });
 
     // Add to cart from Quick View Modal
@@ -2135,7 +2180,7 @@ document.addEventListener("DOMContentLoaded", () => {
               // Trigger Confetti and success modal
               triggerConfetti();
               elements.successModal.classList.add("active");
-              document.body.style.overflow = "hidden";
+              updateScrollLock();
           } else {
               closeCheckout();
               const msg = data.error || "تعذر إتمام الطلب، حاول مرة أخرى";
@@ -2256,7 +2301,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       elements.paymentGateDynamicContainer.innerHTML = gateHtml;
       elements.paymentGateModal.classList.add('active');
-      document.body.style.overflow = "hidden";
+      updateScrollLock();
 
       // Bind copy buttons actions
       const copyBankBtn = document.getElementById('copyBankBtn');
@@ -2503,12 +2548,13 @@ document.addEventListener("DOMContentLoaded", () => {
     const closeAuthBtn = document.getElementById("closeAuthBtn");
     const authBackdrop = document.getElementById("authBackdrop");
     
-    const closeAuth = () => { userAuthModal.classList.remove("active"); };
+    const closeAuth = () => { userAuthModal.classList.remove("active"); updateScrollLock(); };
     closeAuthBtn.addEventListener("click", closeAuth);
     authBackdrop.addEventListener("click", closeAuth);
 
     userAuthBtn.addEventListener("click", () => {
         userAuthModal.classList.add("active");
+        updateScrollLock();
         updateAuthStateUI();
     });
 
@@ -2777,7 +2823,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const suggestions = document.getElementById('searchSuggestions');
             if (suggestions) suggestions.style.display = 'none';
 
-            document.body.style.overflow = '';
+            updateScrollLock();
         }
     });
 

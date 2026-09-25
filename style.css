@@ -85,6 +85,32 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* ─── Mobile scroll lock while a drawer/modal is open ───────────────────────
+   overflow:hidden alone is ignored by iOS Safari, so the body is pinned with
+   position:fixed at its current offset (set inline by main.js) and released
+   when every overlay closes. */
+body.modal-open {
+  position: fixed;
+  left: 0;
+  right: 0;
+  width: 100%;
+  overflow: hidden;
+}
+
+/* Scroll chaining: reaching the end of an inner list must not scroll the page */
+.cart-drawer,
+.wishlist-drawer,
+.mobile-drawer,
+.cart-items-list,
+.shop-sidebar-filter,
+.modal-content-wrapper,
+.checkout-modal-content,
+.success-modal-content,
+.comments-list {
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
@@ -734,6 +760,7 @@ img {
   box-shadow: var(--shadow-lg);
   transition: right var(--transition-normal);
   border-left: 1px solid var(--color-border);
+  overflow-y: auto;
 }
 .mobile-drawer.active {
   right: 0;
