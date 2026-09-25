@@ -1051,7 +1051,7 @@ app.delete('/api/admin/reviews/:id', authenticateToken, isAdmin, (req, res) => {
 // ======================== ORDERS ROUTES ========================
 // Valid promo codes — the server is the source of truth for pricing.
 const VALID_PROMO_CODES = { DAVINCI10: 0.1, LUXE10: 0.1 };
-const VALID_ORDER_STATUSES = ['pending', 'pending_payment_verification', 'delivered', 'cancelled'];
+const VALID_ORDER_STATUSES = ['pending', 'pending_payment_verification', 'completed', 'cancelled'];
 
 app.post('/api/orders', orderLimiter, (req, res) => {
     const body = req.body || {};
