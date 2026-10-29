@@ -397,7 +397,7 @@ document.addEventListener("DOMContentLoaded", () => {
         products = apiProducts.map(p => ({
             ...p,
             image:  optimizedImage(p.image),
-            images: (p.images || []).map(optimizedImage)
+            images: (p.images || []).map(img => optimizedImage(img))
         }));
         productsLoaded = true;
         productsLoadFailed = false;
@@ -461,6 +461,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // ── Images: ask the CDN for a web-sized copy instead of the raw photo ────
   function optimizedImage(url, width = 900) {
     if (typeof url !== 'string' || !url) return url || '';
+    if (!Number.isFinite(width) || width <= 0) width = 900;
     if (/res\.cloudinary\.com\//.test(url)) {
       // Never stack a second transformation set on an already-optimised URL
       if (/\/upload\/(v\d+\/)?[^/]*(w_|h_|q_|f_|fl_)/.test(url)) return url;
