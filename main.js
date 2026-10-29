@@ -6,10 +6,71 @@ document.addEventListener("DOMContentLoaded", () => {
   // --- STATE VARIABLES ---
   let products = [];
   let userToken = localStorage.getItem("userToken") || null;
-  let cart = [];
-  try { cart = JSON.parse(localStorage.getItem("davinci_store_cart")) || []; } catch(e) { cart = []; }
-  let wishlist = [];
-  try { wishlist = JSON.parse(localStorage.getItem("davinci_store_wishlist")) || []; } catch(e) { wishlist = []; }
+
+  // ─── WHOSE BASKET IS THIS? ───────────────────────────────────────────────
+  // The cart and the wishlist belong to the person looking at the screen:
+  // one storage bucket per signed-in account, one for guests. Everything lives
+  // in localStorage, so "clear browsing data" in the browser wipes it, and a
+  // visitor on another device or another profile never sees anyone else's.
+  const GUEST_SCOPE = "guest";
+  const cartBucket = (scope) => `davinci_store_cart:${scope}`;
+  const wishBucket = (scope) => `davinci_store_wishlist:${scope}`;
+  const promoBucket = (scope) => `davinci_store_promo:${scope}`;
+  function storageScope() {
+    const u = userToken ? parseJwt(userToken) : null;
+    return u && u.id ? "u" + u.id : GUEST_SCOPE;
+  }
+  function readStoredList(key) {
+    try {
+      const value = JSON.parse(localStorage.getItem(key));
+      return Array.isArray(value) ? value : [];
+    } catch (e) { return []; }
+  }
+  function writeCart() { localStorage.setItem(cartBucket(storageScope()), JSON.stringify(cart)); }
+  function writeWishlist() { localStorage.setItem(wishBucket(storageScope()), JSON.stringify(wishlist)); }
+  function readStoredPromo() {
+    try {
+      const p = JSON.parse(localStorage.getItem(promoBucket(storageScope())));
+      return p && p.code ? p : null;
+    } catch (e) { return null; }
+  }
+  function writePromo() {
+    const key = promoBucket(storageScope());
+    if (currentPromo) localStorage.setItem(key, JSON.stringify(currentPromo));
+    else localStorage.removeItem(key);
+  }
+
+  const cartLineId = (item) => `${item.productId}|${item.size || ""}|${(item.color && item.color.name) || ""}`;
+
+  // Adds rows from one bucket into another without duplicating a line the
+  // person already has, capped at the cart's own 10-piece limit.
+  function mergeCartLists(target, incoming) {
+    for (const item of incoming) {
+      const row = target.find(x => cartLineId(x) === cartLineId(item));
+      if (row) row.quantity = Math.min(10, (row.quantity || 1) + (item.quantity || 1));
+      else target.push(item);
+    }
+    return target;
+  }
+
+  // Earlier builds used one shared key for every visitor. Fold whatever is
+  // still in it into the current person's bucket, then drop the old keys.
+  function migrateLegacyBuckets() {
+    const scope = storageScope();
+    if (localStorage.getItem("davinci_store_cart") === null && localStorage.getItem("davinci_store_wishlist") === null) return;
+    localStorage.setItem(cartBucket(scope), JSON.stringify(
+      mergeCartLists(readStoredList(cartBucket(scope)), readStoredList("davinci_store_cart"))
+    ));
+    localStorage.setItem(wishBucket(scope), JSON.stringify(
+      [...new Set(readStoredList(wishBucket(scope)).concat(readStoredList("davinci_store_wishlist")))]
+    ));
+    localStorage.removeItem("davinci_store_cart");
+    localStorage.removeItem("davinci_store_wishlist");
+  }
+
+  migrateLegacyBuckets();
+  let cart = readStoredList(cartBucket(storageScope()));
+  let wishlist = readStoredList(wishBucket(storageScope()));
   let currentFilter = {
     category: "all",
     searchQuery: "",
@@ -18,10 +79,17 @@ document.addEventListener("DOMContentLoaded", () => {
     featuredOnly: false,
     sortBy: "featured"
   };
-  let currentPromo = null; // Stores promo discount details
+  let currentPromo = readStoredPromo(); // Stores promo discount details
   let paymentSettings = {}; // Stores payment configuration from server
+  let refreshComments = () => {}; // Bound to the comments loader inside registerEventListeners
   let activeSlide = 0;
   let slideInterval = null;
+  let heroSliderHovered = false;
+  // True only once the catalogue has actually arrived from the server. The
+  // grid ships with skeleton cards, so "nothing rendered yet" must never be
+  // mistaken for "this store has no products".
+  let productsLoaded = false;
+  let productsLoadFailed = false;
 
   // --- SCROLL LOCK (mobile / iOS safe) ---
   // iOS Safari ignores body{overflow:hidden}, so the body is pinned with
@@ -63,6 +131,40 @@ document.addEventListener("DOMContentLoaded", () => {
       lastKnownScrollY = scrollLockY;
     }
   }
+
+  const prefersReducedMotion = () =>
+    window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // ─── MOBILE BACK BUTTON (HISTORY API INTEGRATION) ───
+  // Module scope: category clicks in the nav/sidebar close the drawers too.
+  let isHistoryPushed = false;
+
+  const pushModalHistory = () => {
+    if (!isHistoryPushed) {
+      history.pushState({ modalOpen: true }, "");
+      isHistoryPushed = true;
+    }
+  };
+
+  function closeDrawers(fromPopstate = false) {
+    const activeElements = document.querySelectorAll(
+      ".cart-drawer.active, .mobile-drawer.active, .shop-sidebar-filter.active, .modal.active, .checkout-modal.active, .success-modal.active, .payment-gate-modal.active, .drawer-overlay.active"
+    );
+
+    activeElements.forEach(el => el.classList.remove("active"));
+    updateScrollLock();
+
+    if (isHistoryPushed) {
+      isHistoryPushed = false;
+      if (fromPopstate !== true) {
+        try { history.back(); } catch (e) {}
+      }
+    }
+  }
+
+  window.addEventListener("popstate", () => {
+    if (isHistoryPushed) closeDrawers(true);
+  });
 
   window.addEventListener("scroll", () => {
     if (!scrollLocked) lastKnownScrollY = window.scrollY || window.pageYOffset || 0;
@@ -107,6 +209,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // Shop Grid & Controls
     productsGrid: document.getElementById("productsGrid"),
     noProductsFound: document.getElementById("noProductsFound"),
+    productsLoadError: document.getElementById("productsLoadError"),
     currentCategoryTitle: document.getElementById("currentCategoryTitle"),
     productsCountText: document.getElementById("productsCountText"),
     sortBySelect: document.getElementById("sortBySelect"),
@@ -124,6 +227,7 @@ document.addEventListener("DOMContentLoaded", () => {
     featuredCheckbox: document.getElementById("featuredCheckbox"),
     resetFiltersBtn: document.getElementById("resetFiltersBtn"),
     resetFiltersBtnEmpty: document.getElementById("resetFiltersBtnEmpty"),
+    retryProductsBtn: document.getElementById("retryProductsBtn"),
 
     // Side Cart Drawer
     cartDrawer: document.getElementById("cartDrawer"),
@@ -155,6 +259,12 @@ document.addEventListener("DOMContentLoaded", () => {
     qvPrice: document.getElementById("qvPrice"),
     qvOldPrice: document.getElementById("qvOldPrice"),
     qvDescription: document.getElementById("qvDescription"),
+    qvSku: document.getElementById("qvSku"),
+    qvStock: document.getElementById("qvStock"),
+    qvMaterialRow: document.getElementById("qvMaterialRow"),
+    qvMaterial: document.getElementById("qvMaterial"),
+    qvColorsCount: document.getElementById("qvColorsCount"),
+    qvSizesCount: document.getElementById("qvSizesCount"),
     qvSelectedColorText: document.getElementById("qvSelectedColorText"),
     qvColorsContainer: document.getElementById("qvColorsContainer"),
     qvSelectedSizeText: document.getElementById("qvSelectedSizeText"),
@@ -240,74 +350,175 @@ document.addEventListener("DOMContentLoaded", () => {
   initApp();
 
   async function initApp() {
-    try {
-        const prodRes = await fetch(`${API_BASE}/products`);
-        if (!prodRes.ok) throw new Error(`HTTP ${prodRes.status}`);
-        const apiProducts = await prodRes.json();
-        if (Array.isArray(apiProducts) && apiProducts.length > 0) {
-            products = apiProducts;
-        } else if (typeof window !== 'undefined' && window.products && Array.isArray(window.products)) {
-            products = window.products;
-        }
-    } catch(err) {
-        console.warn("API unavailable, using local products.js data:", err.message);
-        if (typeof window !== 'undefined' && window.products && Array.isArray(window.products)) {
-            products = window.products;
-        }
-    }
+    // A restored session can still find a basket in the guest bucket — the
+    // person built it here before signing in. Hand it to the account once.
+    adoptGuestBuckets();
 
-    try {
-        const setRes = await fetch(`${API_BASE}/settings`);
-        const settings = await setRes.json();
-        paymentSettings = settings;
-        setupDynamicPaymentMethods(settings);
-
-        // ── Load announcement bar from settings ──────────────────────────
-        initAnnouncementBar(settings);
-
-        // ── Apply custom theme color & mode ───────────────────────────────
-        if (settings.theme_color) {
-            applyThemeColor(settings.theme_color);
-        }
-        if (settings.theme_mode) {
-            localStorage.setItem('theme_mode', settings.theme_mode);
-            applyThemeMode(settings.theme_mode);
-        }
-        // ── Apply custom hero slider content ──────────────────────────────
-        if (settings.hero_slides) {
-            applyHeroSlides(settings.hero_slides);
-        }
-        // ── Apply custom store features (quick stats) ─────────────────────
-        if (settings.store_features) {
-            applyStoreFeatures(settings.store_features);
-        }
-
-    } catch(err) {
-        console.error("Failed to load settings from server", err);
-    }
-
-    try {
-        const catRes = await fetch(`${API_BASE}/categories`);
-        if (catRes.ok) {
-            const categories = await catRes.json();
-            if (Array.isArray(categories) && categories.length > 0) {
-                applyDynamicCategories(categories);
-            }
-        }
-    } catch(err) {
-        console.warn("Failed to load categories from server", err);
-    }
+    await Promise.all([loadProducts(), loadSettings(), loadCategories()]);
 
     renderProducts();
     updateCartUI();
     updateWishlistUI();
     updateCategoryCounts();
     startHeroSlider();
+    setupHeroSliderPause();
     registerEventListeners();
     updateAuthStateUI();
     initGoogleSignIn();
     initGovernorateSelect();
-    loadStoreComments();
+    connectLiveUpdates();
+  }
+
+  // ── Public data loaders (first paint + live refresh) ────────────────────
+  async function loadProducts() {
+    try {
+        const prodRes = await fetch(`${API_BASE}/products`);
+        if (!prodRes.ok) throw new Error(`HTTP ${prodRes.status}`);
+        const apiProducts = await prodRes.json();
+        if (!Array.isArray(apiProducts)) return;
+        products = apiProducts.map(p => ({
+            ...p,
+            image:  optimizedImage(p.image),
+            images: (p.images || []).map(optimizedImage)
+        }));
+        productsLoaded = true;
+        productsLoadFailed = false;
+        pruneCartOfDeletedProducts();
+    } catch(err) {
+        productsLoadFailed = true;
+        console.warn("Failed to load products from server:", err.message);
+    }
+  }
+
+  async function loadSettings() {
+    try {
+        const setRes = await fetch(`${API_BASE}/settings`);
+        if (!setRes.ok) throw new Error(`HTTP ${setRes.status}`);
+        applySettings(await setRes.json());
+    } catch(err) {
+        console.error("Failed to load settings from server", err);
+    }
+  }
+
+  function applySettings(settings) {
+    paymentSettings = settings;
+
+    // Rebuilding the payment grid would reset the method the customer already
+    // picked, so it is skipped while the checkout wizard is open.
+    if (!elements.checkoutModal || !elements.checkoutModal.classList.contains("active")) {
+        setupDynamicPaymentMethods(settings);
+    }
+
+    initAnnouncementBar(settings);
+
+    if (settings.theme_color) {
+        applyThemeColor(settings.theme_color);
+    }
+    if (settings.theme_mode) {
+        localStorage.setItem('theme_mode', settings.theme_mode);
+        applyThemeMode(settings.theme_mode);
+    }
+    if (settings.hero_slides) {
+        applyHeroSlides(settings.hero_slides);
+        startHeroSlider();
+    }
+    if (settings.store_features) {
+        applyStoreFeatures(settings.store_features);
+    }
+  }
+
+  async function loadCategories() {
+    try {
+        const catRes = await fetch(`${API_BASE}/categories`);
+        if (!catRes.ok) return;
+        const categories = await catRes.json();
+        if (Array.isArray(categories) && categories.length > 0) {
+            applyDynamicCategories(categories.map(c => ({ ...c, image: optimizedImage(c.image, 800) })));
+        }
+    } catch(err) {
+        console.warn("Failed to load categories from server", err);
+    }
+  }
+
+  // ── Images: ask the CDN for a web-sized copy instead of the raw photo ────
+  function optimizedImage(url, width = 900) {
+    if (typeof url !== 'string' || !url) return url || '';
+    if (/res\.cloudinary\.com\//.test(url)) {
+      // Never stack a second transformation set on an already-optimised URL
+      if (/\/upload\/(v\d+\/)?[^/]*(w_|h_|q_|f_|fl_)/.test(url)) return url;
+      return url.replace('/upload/', `/upload/f_webp,q_auto,w_${width}/`);
+    }
+    if (/^\.?\/?assets\/images\/.+\.(jpe?g|png)$/i.test(url)) {
+      return url.replace(/\.(jpe?g|png)$/i, '.webp');
+    }
+    return url;
+  }
+
+  // ─── Live sync with the admin panel ──────────────────────────────────────
+  // The server pushes the name of whatever collection an admin just changed,
+  // so colours, decor, products and comments update in an open tab with no
+  // reload. Background tabs can miss pushes, so they re-sync when shown again.
+  let liveStream = null;
+  let liveFailures = 0;
+  let liveVisibilityHooked = false;
+
+  function reloadStorefrontData() {
+    return Promise.all([loadProducts(), loadSettings(), loadCategories()]).then(() => {
+      renderProducts();
+      updateCartUI();
+      updateCategoryCounts();
+      refreshComments();
+    });
+  }
+
+  function connectLiveUpdates() {
+    if (typeof EventSource === 'undefined') return;
+    // One stream per page: a lingering stream would hold an HTTP/1.1 socket and
+    // starve the replacement connection (and image loads) on slow connections.
+    if (liveStream) { try { liveStream.close(); } catch (e) {} liveStream = null; }
+
+    if (!liveVisibilityHooked) {
+      liveVisibilityHooked = true;
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) reloadStorefrontData();
+      });
+    }
+
+    const stream = new EventSource(`${API_BASE}/events`);
+    liveStream = stream;
+    window.addEventListener('pagehide', () => { try { stream.close(); } catch (e) {} }, { once: true });
+
+    stream.addEventListener('open', () => { liveFailures = 0; });
+
+    stream.addEventListener('update', async (e) => {
+      let topic = '';
+      try { topic = JSON.parse(e.data).topic; } catch (err) { return; }
+
+      if (topic === 'products') {
+        await loadProducts();
+        renderProducts();
+        updateCartUI();
+        updateCategoryCounts();
+      } else if (topic === 'categories') {
+        await loadCategories();
+        renderProducts();
+        updateCategoryCounts();
+      } else if (topic === 'settings') {
+        await loadSettings();
+        refreshComments();
+      } else if (topic === 'reviews') {
+        refreshComments();
+      }
+    });
+
+    stream.addEventListener('error', () => {
+      if (stream.readyState !== EventSource.CLOSED) return;
+      liveFailures++;
+      // A server without /api/events (or a proxy that kills SSE) must not be
+      // hammered every few seconds — back off and stop after repeated failures.
+      if (liveFailures > 6) return;
+      setTimeout(connectLiveUpdates, Math.min(5000 * liveFailures, 60000));
+    });
   }
 
   // ── Dynamic Theme Color Application ─────────────────────────────────────
@@ -361,16 +572,22 @@ document.addEventListener("DOMContentLoaded", () => {
       if (slideEls[index]) {
         const slideEl = slideEls[index];
         if (sData.image) {
-          slideEl.style.backgroundImage = `linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.75)), url('${sData.image}')`;
+          const heroUrl = optimizedImage(sData.image, 1600);
+          slideEl.style.backgroundImage = `linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.75)), url('${heroUrl}')`;
         }
-        const subtitleEl = slideEl.querySelector('.slide-subtitle');
-        if (subtitleEl && sData.subtitle) subtitleEl.textContent = sData.subtitle;
 
-        const titleEl = slideEl.querySelector('.slide-title');
-        if (titleEl && sData.title) titleEl.textContent = sData.title;
+        // An empty field means "use the built-in text", so clearing in admin
+        // reverts the storefront instead of leaving the previous value stuck.
+        const setText = (selector, value) => {
+          const el = slideEl.querySelector(selector);
+          if (!el) return;
+          if (!el.dataset.defaultText) el.dataset.defaultText = el.textContent.trim();
+          el.textContent = value || el.dataset.defaultText;
+        };
 
-        const descEl = slideEl.querySelector('.slide-desc');
-        if (descEl && sData.desc) descEl.textContent = sData.desc;
+        setText('.slide-subtitle', sData.subtitle);
+        setText('.slide-title', sData.title);
+        setText('.slide-desc', sData.description ?? sData.desc);
       }
     });
   }
@@ -475,7 +692,7 @@ document.addEventListener("DOMContentLoaded", () => {
         gridHtml += `
           <a href="#shop-section" class="category-card" data-category="${catKey}">
             <div class="category-img-container">
-              <img src="${imgPath}" alt="${cat.name}" onerror="this.src='./assets/images/cat_clothing.jpg'">
+              <img src="${imgPath}" alt="${cat.name}" loading="lazy" decoding="async" onerror="this.onerror=null;this.src=this.src.replace(/\\.webp$/, '.jpg')">
               <div class="category-overlay">
                 <h3>${cat.name}</h3>
                 <span class="category-link">تصفح الآن <i class="fa-solid fa-circle-arrow-left"></i></span>
@@ -641,14 +858,16 @@ document.addEventListener("DOMContentLoaded", () => {
     if (methodsDiv) {
         let html = '';
 
-        // Cash on delivery - Enabled and Checked by default
+        // Cash on delivery — follows the switch in the admin settings
+        const codEnabled = settings.cash_on_delivery_enabled !== 'false' && settings.cash_on_delivery_enabled !== false;
         html += `
-        <label class="payment-option-card">
-          <input type="radio" name="paymentMethod" value="cod" checked>
+        <label class="payment-option-card${codEnabled ? '' : ' disabled'}"${codEnabled ? '' : ' style="opacity: 0.55; cursor: not-allowed; pointer-events: none;"'}>
+          <input type="radio" name="paymentMethod" value="cod"${codEnabled ? ' checked' : ' disabled'}>
           <span class="payment-card-inner">
             <span class="payment-icon"><i class="fa-solid fa-hand-holding-dollar"></i></span>
             <span class="payment-name">الدفع عند الاستلام</span>
             <span class="payment-desc">الدفع للمندوب عند استلام شحنتك الفاخرة.</span>
+            ${codEnabled ? '' : '<span style="font-size: 0.65rem; background-color: rgba(212, 175, 55, 0.15); color: var(--color-gold); padding: 3px 8px; border-radius: 4px; font-weight: 700; margin-top: 8px; display: inline-block; width: fit-content;">غير متوفر حالياً</span>'}
           </span>
         </label>`;
 
@@ -735,6 +954,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // --- HERO SLIDER FUNCTIONALITY ---
   function startHeroSlider() {
     stopHeroSlider();
+    if (heroSliderHovered || document.hidden || prefersReducedMotion()) return;
     slideInterval = setInterval(() => {
       nextSlide();
     }, 6000);
@@ -742,6 +962,20 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function stopHeroSlider() {
     if (slideInterval) clearInterval(slideInterval);
+    slideInterval = null;
+  }
+
+  // Autoplay must not fight the visitor: it pauses while the hero is hovered or
+  // the tab is hidden, and never moves for reduced-motion preferences.
+  function setupHeroSliderPause() {
+    const hero = document.getElementById("heroSlider");
+    if (hero) {
+      hero.addEventListener("mouseenter", () => { heroSliderHovered = true; stopHeroSlider(); });
+      hero.addEventListener("mouseleave", () => { heroSliderHovered = false; startHeroSlider(); });
+    }
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) stopHeroSlider(); else startHeroSlider();
+    });
   }
 
   function nextSlide() {
@@ -759,7 +993,39 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // --- PRODUCTS RENDERING & FILTERING ---
+  // Typing in the sidebar search or dragging the price slider fires far more
+  // events than the grid can be rebuilt for. Coalescing to one render per
+  // ~90ms keeps the label live without thrashing the layout. A timer rather
+  // than requestAnimationFrame, because rAF is throttled in background tabs
+  // and the filter must still apply there.
+  let gridRenderTimer = null;
+  function scheduleRenderProducts() {
+    if (gridRenderTimer !== null) return;
+    gridRenderTimer = setTimeout(() => {
+      gridRenderTimer = null;
+      renderProducts();
+    }, 90);
+  }
+
+  // The skeleton grid is swapped for real cards exactly once per page load;
+  // that swap gets a single staggered entrance so it reads as a reveal
+  // instead of a hard pop. Re-running it on every filter change would be
+  // the flicker we are trying to remove.
+  let gridRevealed = false;
+  function revealGridOnce() {
+    if (gridRevealed || !elements.productsGrid) return;
+    gridRevealed = true;
+    elements.productsGrid.classList.add("grid-revealed");
+    setTimeout(() => {
+      if (elements.productsGrid) elements.productsGrid.classList.remove("grid-revealed");
+    }, 1200);
+  }
+
   function renderProducts() {
+    if (gridRenderTimer !== null) {
+      clearTimeout(gridRenderTimer);
+      gridRenderTimer = null;
+    }
     let filteredList = [...products];
 
     // Filter by category
@@ -803,7 +1069,11 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // Update Counts & Titles
-    if (elements.productsCountText) elements.productsCountText.innerText = `نعرض لكم ${filteredList.length} من أصل ${products.length} منتجاً فاخراً`;
+    if (elements.productsCountText) {
+      elements.productsCountText.innerText = productsLoaded
+        ? `نعرض لكم ${filteredList.length} من أصل ${products.length} منتجاً فاخراً`
+        : "جارٍ تحميل المنتجات…";
+    }
     
     const catTitles = {
       all: "كل المنتجات الفاخرة",
@@ -821,33 +1091,53 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Handle Empty State
     if (filteredList.length === 0) {
-      if (elements.productsGrid) elements.productsGrid.style.display = "none";
-      if (elements.noProductsFound) elements.noProductsFound.style.display = "block";
-      return;
+        // The grid ships with skeleton cards. While the first fetch is still
+        // running they hold the space; a failed fetch must not leave them
+        // shimmering, and an undelivered catalogue must never claim "no results".
+        if (!productsLoaded) {
+          if (elements.noProductsFound) elements.noProductsFound.style.display = "none";
+          if (elements.productsGrid) elements.productsGrid.style.display = productsLoadFailed ? "none" : "grid";
+          if (elements.productsLoadError) elements.productsLoadError.style.display = productsLoadFailed ? "block" : "none";
+          return;
+        }
+        if (elements.productsLoadError) elements.productsLoadError.style.display = "none";
+        if (elements.productsGrid) elements.productsGrid.style.display = "none";
+        if (elements.noProductsFound) elements.noProductsFound.style.display = "block";
+        return;
     }
 
+    if (elements.productsLoadError) elements.productsLoadError.style.display = "none";
     if (elements.productsGrid) elements.productsGrid.style.display = "grid";
     if (elements.noProductsFound) elements.noProductsFound.style.display = "none";
 
     // Draw grid items HTML
     if (!elements.productsGrid) return;
+    const wasSkeleton = elements.productsGrid.querySelector(".skeleton-card");
     elements.productsGrid.innerHTML = filteredList.map(product => {
       const discountPercentage = product.oldPrice 
         ? Math.round(((product.oldPrice - product.price) / product.oldPrice) * 100) 
         : 0;
 
       const isWishlisted = wishlist.some(id => String(id) === String(product.id));
+      const sizesList = Array.isArray(product.sizes) ? product.sizes : [];
+      const colorsList = Array.isArray(product.colors) ? product.colors : [];
+      const metaParts = [];
+      if (sizesList.length) metaParts.push(`${sizesList.length} مقاسات`);
+      if (colorsList.length) metaParts.push(`${colorsList.length} ألوان`);
+      const metaLine = metaParts.length ? `<div class="product-card-meta">${metaParts.join(" · ")}</div>` : "";
+      const outOfStock = product.inStock === false;
 
       return `
-        <article class="product-card" data-id="${product.id}">
+        <article class="product-card${outOfStock ? " out-of-stock" : ""}" data-id="${product.id}">
           ${discountPercentage > 0 ? `<span class="product-badge discount">خصم ${discountPercentage}%</span>` : (product.featured ? `<span class="product-badge featured">متميز</span>` : "")}
+          ${outOfStock ? `<span class="product-badge stockout">غير متوفر</span>` : ""}
           
           <button class="wishlist-btn-card ${isWishlisted ? "active" : ""}" aria-label="أضف للمفضلة" onclick="window.vogueToggleWishlist('${product.id}')">
             <i class="${isWishlisted ? "fa-solid" : "fa-regular"} fa-heart"></i>
           </button>
           
           <div class="product-card-image">
-            <img src="${product.image}" alt="${product.name}">
+            <img src="${product.image}" alt="${product.name}" loading="lazy" decoding="async">
             <div class="quick-view-overlay">
               <button class="btn-quickview" onclick="window.vogueOpenQuickView('${product.id}')">
                 <i class="fa-solid fa-eye"></i> عرض سريع
@@ -865,20 +1155,25 @@ document.addEventListener("DOMContentLoaded", () => {
               </div>
               <span>(${product.reviewsCount})</span>
             </div>
+
+            ${metaLine}
             
             <div class="product-card-footer">
               <div class="product-card-price">
                 <span class="price-current">${formatPrice(product.price)}</span>
                 ${product.oldPrice ? `<span class="price-old">${formatPrice(product.oldPrice)}</span>` : ""}
               </div>
-              <button class="btn-buy-card" onclick="window.vogueQuickAddToCart('${product.id}')" aria-label="أضف للسلة">
+              ${outOfStock
+                ? `<span class="btn-buy-card disabled" aria-label="غير متوفر حالياً"><i class="fa-solid fa-ban"></i></span>`
+                : `<button class="btn-buy-card" onclick="window.vogueQuickAddToCart('${product.id}')" aria-label="أضف للسلة">
                 <i class="fa-solid fa-cart-plus"></i>
-              </button>
+              </button>`}
             </div>
           </div>
         </article>
       `;
     }).join("");
+    if (wasSkeleton) revealGridOnce();
   }
 
   function generateStarsHTML(rating) {
@@ -916,14 +1211,26 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  // Building a NumberFormat per call costs ~1ms; the grid renders dozens.
+  const priceFormatter = new Intl.NumberFormat("ar-EG");
   function formatPrice(number) {
     const val = parseFloat(number) || 0;
-    return `${val.toLocaleString("ar-EG")} ج.م`;
+    return `${priceFormatter.format(val)} ج.م`;
   }
 
   // --- CART OPERATIONS ---
+  // Drops cart rows whose product was deleted from the store, so the cart
+  // badge, drawer and checkout never carry invisible "ghost" items.
+  function pruneCartOfDeletedProducts() {
+    if (!productsLoaded) return;
+    const validCart = cart.filter(item => products.some(p => String(p.id) === String(item.productId)));
+    if (validCart.length === cart.length) return;
+    cart = validCart;
+    writeCart();
+  }
+
   function updateCartUI() {
-    localStorage.setItem("davinci_store_cart", JSON.stringify(cart));
+    writeCart();
     
     // Updates count badges
     const totalQty = cart.reduce((sum, item) => sum + item.quantity, 0);
@@ -948,11 +1255,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
         return `
           <div class="cart-item">
-            <img src="${prod.image}" alt="${prod.name}" class="cart-item-img">
+            <img src="${prod.image}" alt="${prod.name}" class="cart-item-img" loading="lazy" decoding="async">
             <div class="cart-item-details">
               <h4 class="cart-item-name">${prod.name}</h4>
               <div class="cart-item-meta">
-                <span>المقاس: ${item.size || 'N/A'}</span> | <span>اللون: ${item.color && item.color.name ? item.color.name : 'افتراضي'}</span>
+                <span>المقاس: ${item.size || 'N/A'}</span> |
+                <span class="cart-color-meta">اللون: ${item.color && item.color.name ? item.color.name : 'افتراضي'}<span class="color-dot" style="background:${item.color && item.color.code ? item.color.code : '#888888'};"></span></span>
               </div>
               <div class="cart-item-controls">
                 <div class="cart-qty-selector">
@@ -1021,6 +1329,10 @@ document.addEventListener("DOMContentLoaded", () => {
   window.vogueQuickAddToCart = (productId) => {
     const prod = products.find(p => String(p.id) === String(productId));
     if (!prod) return;
+    if (prod.inStock === false) {
+      showToastNotification("هذا المنتج غير متوفر حالياً", "error");
+      return;
+    }
 
     // Pick first size and first color as default for quick-buy
     const size = prod.sizes && prod.sizes.length > 0 ? prod.sizes[0] : 'N/A';
@@ -1038,6 +1350,13 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   function addToCart(productId, size, color, quantity) {
+    const prod = products.find(p => String(p.id) === String(productId));
+    if (!prod) return;
+    if (prod.inStock === false) {
+      showToastNotification("عذراً، هذا المنتج غير متوفر حالياً", "error");
+      return;
+    }
+
     // Check if item already exists in cart with same color and size
     const existingIndex = cart.findIndex(item => 
       String(item.productId) === String(productId) && 
@@ -1064,7 +1383,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (products.length > 0) {
       wishlist = wishlist.filter(id => products.some(p => String(p.id) === String(id)));
     }
-    localStorage.setItem("davinci_store_wishlist", JSON.stringify(wishlist));
+    writeWishlist();
     
     // Update count badges
     if (elements.wishlistCount) elements.wishlistCount.innerText = wishlist.length;
@@ -1112,7 +1431,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (idx > -1) {
       wishlist.splice(idx, 1);
     } else {
-      wishlist.push(productId);
+      wishlist.push(String(productId));
     }
     updateWishlistUI();
     renderProducts(); // Refresh grids for heart icon states
@@ -1130,6 +1449,21 @@ document.addEventListener("DOMContentLoaded", () => {
     // Set text values
     elements.qvCategory.innerText = prod.categoryName;
     elements.qvName.innerText = prod.name;
+
+    // SKU + stock status
+    elements.qvSku.innerText = `SKU: DV-${prod.id}`;
+    const outOfStock = prod.inStock === false;
+    elements.qvStock.innerText = outOfStock ? "غير متوفر حالياً" : "متوفر";
+    elements.qvStock.className = "qv-stock-badge " + (outOfStock ? "out" : "in");
+
+    // Material / fabric row
+    if (prod.material && String(prod.material).trim()) {
+      elements.qvMaterialRow.style.display = "flex";
+      elements.qvMaterial.innerText = prod.material;
+    } else {
+      elements.qvMaterialRow.style.display = "none";
+      elements.qvMaterial.innerText = "";
+    }
     
     // Build images array (use images[] first, fallback to image)
     const allImages = (prod.images && prod.images.length > 0) ? prod.images : (prod.image ? [prod.image] : []);
@@ -1177,14 +1511,17 @@ document.addEventListener("DOMContentLoaded", () => {
           <button class="color-swatch-btn ${qvSelectedColor && color.name === qvSelectedColor.name ? 'active' : ''}" 
                   style="--swatch-color: ${color.code}" 
                   data-color-name="${color.name}"
+                  title="${color.name}"
                   aria-label="${color.name}">
           </button>
         `;
       }).join("");
       elements.qvSelectedColorText.innerText = qvSelectedColor ? qvSelectedColor.name : '';
+      elements.qvColorsCount.innerText = `(${prod.colors.length} ${prod.colors.length === 1 ? "لون" : "ألوان"})`;
     } else {
       elements.qvColorsContainer.innerHTML = '<span style="color:var(--color-text-muted);font-size:0.85rem;">لا توجد ألوان</span>';
       elements.qvSelectedColorText.innerText = '';
+      elements.qvColorsCount.innerText = '';
     }
 
     // Size Swatches
@@ -1192,17 +1529,29 @@ document.addEventListener("DOMContentLoaded", () => {
       elements.qvSizesContainer.innerHTML = prod.sizes.map(size => {
         return `
           <button class="size-swatch-btn ${size === qvSelectedSize ? 'active' : ''}" 
-                  data-size="${size}">
+                  data-size="${size}"
+                  title="مقاس ${size}">
             ${size}
           </button>
         `;
       }).join("");
       elements.qvSelectedSizeText.innerText = qvSelectedSize || '';
+      elements.qvSizesCount.innerText = `(${prod.sizes.length} ${prod.sizes.length === 1 ? "مقاس" : "مقاسات"})`;
     } else {
       elements.qvSizesContainer.innerHTML = '<span style="color:var(--color-text-muted);font-size:0.85rem;">مقاس واحد</span>';
       elements.qvSelectedSizeText.innerText = 'مقاس واحد';
+      elements.qvSizesCount.innerText = '';
     }
     elements.qvQtyVal.value = 1;
+
+    // Disable add-to-cart when the product is out of stock
+    if (outOfStock) {
+      elements.qvAddToCartBtn.disabled = true;
+      elements.qvAddToCartBtn.innerHTML = '<i class="fa-solid fa-ban"></i> غير متوفر حالياً';
+    } else {
+      elements.qvAddToCartBtn.disabled = false;
+      elements.qvAddToCartBtn.innerHTML = '<i class="fa-solid fa-bag-shopping"></i> إضافة لحقيبة التسوق';
+    }
 
     // Add color click events (only if colors exist)
     const colorBtns = elements.qvColorsContainer.querySelectorAll(".color-swatch-btn");
@@ -1314,6 +1663,13 @@ document.addEventListener("DOMContentLoaded", () => {
     return true;
   }
 
+  // The admin can switch a payment method off, so never fall back to an
+  // unchecked or a disabled option.
+  function getChosenPaymentMethod() {
+    const chosen = document.querySelector('input[name="paymentMethod"]:checked:not(:disabled)');
+    return chosen ? chosen.value : null;
+  }
+
   function updateCheckoutSummary() {
     // Collect inputs
     const fn = document.getElementById("coFirstName").value;
@@ -1325,11 +1681,32 @@ document.addEventListener("DOMContentLoaded", () => {
 
     elements.summaryAddressText.innerText = `${fn} ${ln} - ${ph}، ${ad}، ${city}، ${gov}`;
 
+    // Items recap: name, size, color, quantity and line price for each row
+    const reviewEl = document.getElementById("coReviewItems");
+    if (reviewEl) {
+      reviewEl.innerHTML = cart.map(item => {
+        const prod = products.find(p => String(p.id) === String(item.productId));
+        if (!prod) return "";
+        const lineTotal = formatPrice((parseFloat(prod.price) || 0) * item.quantity);
+        return `
+          <div class="co-review-item">
+            <img src="${prod.image}" alt="${prod.name}" loading="lazy" decoding="async">
+            <div class="co-review-item-info">
+              <span class="co-review-item-name">${prod.name}</span>
+              <span class="co-review-item-specs">
+                المقاس: ${item.size || "N/A"}
+                ${item.color && item.color.name ? ` · اللون: ${item.color.name}` : ""}
+                ${item.quantity > 1 ? ` · الكمية: ${item.quantity}` : ""}
+              </span>
+            </div>
+            <span class="co-review-item-price">${lineTotal}</span>
+          </div>
+        `;
+      }).join("");
+    }
+
     // Get selected payment option
-    let selectedMethod = "cod";
-    elements.paymentMethods.forEach(method => {
-      if (method.checked) selectedMethod = method.value;
-    });
+    const selectedMethod = getChosenPaymentMethod() || "cod";
 
     if (selectedMethod === "cod") {
       elements.summaryPaymentText.innerText = "الدفع نقداً عند الاستلام (COD)";
@@ -1342,6 +1719,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // --- CONFETTI SUCCESS EFFECTS ---
   function triggerConfetti() {
+    if (prefersReducedMotion()) return;
     elements.confettiContainer.innerHTML = "";
     const colors = ["#D4AF37", "#ffffff", "#4682B4", "#30d158", "#ff453a"];
     const piecesCount = 80;
@@ -1374,6 +1752,52 @@ document.addEventListener("DOMContentLoaded", () => {
       } catch(e) {
           return null;
       }
+  }
+
+  // Signing in: the basket built while browsing anonymously belongs to this
+  // account now, so it is merged into the account's own bucket (quantities
+  // capped at the same 10-piece limit the cart enforces) and the guest bucket
+  // is emptied. Signing out: the device goes back to a clean guest state so
+  // the next person at this browser sees nothing of his own.
+  function refreshCartAndWishlistUI() {
+    updateCartUI();
+    updateWishlistUI();
+    pruneCartOfDeletedProducts();
+    renderProducts();
+  }
+
+  function adoptGuestBuckets() {
+    const scope = storageScope();
+    if (scope === GUEST_SCOPE) return;
+    cart = mergeCartLists(readStoredList(cartBucket(scope)), readStoredList(cartBucket(GUEST_SCOPE)));
+    wishlist = [...new Set(readStoredList(wishBucket(scope)).concat(readStoredList(wishBucket(GUEST_SCOPE))))];
+    localStorage.removeItem(cartBucket(GUEST_SCOPE));
+    localStorage.removeItem(wishBucket(GUEST_SCOPE));
+    if (!currentPromo) {
+      try {
+        const guestPromo = JSON.parse(localStorage.getItem(promoBucket(GUEST_SCOPE)));
+        if (guestPromo && guestPromo.code) currentPromo = guestPromo;
+      } catch (e) {}
+    }
+    localStorage.removeItem(promoBucket(GUEST_SCOPE));
+    writeCart();
+    writeWishlist();
+    writePromo();
+  }
+
+  function applyScopeAfterLogin() {
+    adoptGuestBuckets();
+    refreshCartAndWishlistUI();
+  }
+
+  function applyScopeAfterLogout() {
+    cart = [];
+    wishlist = [];
+    currentPromo = null;
+    writeCart();
+    writeWishlist();
+    writePromo();
+    refreshCartAndWishlistUI();
   }
 
   function updateAuthStateUI() {
@@ -1480,27 +1904,76 @@ document.addEventListener("DOMContentLoaded", () => {
     renderOptions('');
   }
 
+  // --- TOASTS ---
+  // Lives at the outer scope: cart guards and auth listeners both need it,
+  // and it must not be trapped inside registerEventListeners().
+  const TOAST_ICONS = {
+    success: 'fa-circle-check',
+    error: 'fa-triangle-exclamation',
+    info: 'fa-circle-info'
+  };
+
+  function showToastNotification(message, type = 'info', duration = 3400) {
+    let host = document.getElementById('globalToastHost');
+    if (!host) {
+      host = document.createElement('div');
+      host.id = 'globalToastHost';
+      host.className = 'toast-host';
+      host.setAttribute('role', 'status');
+      host.setAttribute('aria-live', 'polite');
+      document.body.appendChild(host);
+    }
+
+    const toast = document.createElement('div');
+    toast.className = `toast toast--${TOAST_ICONS[type] ? type : 'info'}`;
+    const icon = document.createElement('i');
+    icon.className = `fa-solid ${TOAST_ICONS[type] || TOAST_ICONS.info}`;
+    icon.setAttribute('aria-hidden', 'true');
+    const text = document.createElement('span');
+    text.textContent = String(message ?? '');
+    toast.append(icon, text);
+    host.appendChild(toast);
+    toast.classList.add('is-in');
+
+    let dismissed = false;
+    const dismiss = () => {
+      if (dismissed) return;
+      dismissed = true;
+      toast.classList.remove('is-in');
+      toast.classList.add('is-out');
+      setTimeout(() => toast.remove(), 300);
+    };
+    setTimeout(dismiss, duration);
+    toast.addEventListener('click', dismiss);
+  }
+
   function registerEventListeners() {
 
-    // Sticky header adjustments
+    // Sticky header densifies past the fold. Writing inline styles on every
+    // scroll event forced a style recalculation ~60x/sec; toggling a class only
+    // when the threshold flips lets CSS handle the fade.
+    const mainHeader = document.getElementById("mainHeader");
+    const scrollTopBtn = document.getElementById("scrollTopBtn");
+    let headerScrolled = null;
+    let showTop = null;
     window.addEventListener("scroll", () => {
-      const header = document.getElementById("mainHeader");
-      if (window.scrollY > 50) {
-        header.style.backgroundColor = "rgba(10, 10, 10, 0.95)";
-      } else {
-        header.style.backgroundColor = "rgba(10, 10, 10, 0.85)";
+      const y = window.scrollY || window.pageYOffset || 0;
+      const scrolled = y > 50;
+      if (scrolled !== headerScrolled) {
+        headerScrolled = scrolled;
+        mainHeader.classList.toggle("is-scrolled", scrolled);
       }
+      const top = y > 600;
+      if (top !== showTop) {
+        showTop = top;
+        scrollTopBtn.classList.toggle("is-visible", top);
+        scrollTopBtn.tabIndex = top ? 0 : -1;
+      }
+    }, { passive: true });
+
+    scrollTopBtn.addEventListener("click", () => {
+      window.scrollTo({ top: 0, behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
     });
-
-    // ─── MOBILE BACK BUTTON (HISTORY API INTEGRATION) ───
-    let isHistoryPushed = false;
-
-    const pushModalHistory = () => {
-      if (!isHistoryPushed) {
-        history.pushState({ modalOpen: true }, "");
-        isHistoryPushed = true;
-      }
-    };
 
     const openDrawerElement = (el) => {
       if (!el) return;
@@ -1518,28 +1991,6 @@ document.addEventListener("DOMContentLoaded", () => {
         pushModalHistory();
       }
     };
-
-    const closeDrawers = (fromPopstate = false) => {
-      const activeElements = document.querySelectorAll(
-        ".cart-drawer.active, .mobile-drawer.active, .shop-sidebar-filter.active, .modal.active, .checkout-modal.active, .success-modal.active, .payment-gate-modal.active, .drawer-overlay.active"
-      );
-
-      activeElements.forEach(el => el.classList.remove("active"));
-      updateScrollLock();
-
-      if (isHistoryPushed) {
-        isHistoryPushed = false;
-        if (fromPopstate !== true) {
-          try { history.back(); } catch(e) {}
-        }
-      }
-    };
-
-    window.addEventListener("popstate", () => {
-      if (isHistoryPushed) {
-        closeDrawers(true);
-      }
-    });
 
     // Make openDrawerElement globally accessible within main scope
     window.vogueOpenDrawer = openDrawerElement;
@@ -1940,7 +2391,7 @@ document.addEventListener("DOMContentLoaded", () => {
     elements.sidebarSearchInput.addEventListener("keyup", (e) => {
       currentFilter.searchQuery = e.target.value;
       elements.searchInput.value = e.target.value; // Sync search inputs
-      renderProducts();
+      scheduleRenderProducts();
     });
 
 
@@ -1955,8 +2406,8 @@ document.addEventListener("DOMContentLoaded", () => {
     elements.priceRangeSlider.addEventListener("input", (e) => {
       const val = parseInt(e.target.value);
       currentFilter.maxPrice = val;
-      elements.priceMaxVal.innerText = `${val.toLocaleString("ar-EG")} ج.م`;
-      renderProducts();
+      elements.priceMaxVal.innerText = `${priceFormatter.format(val)} ج.م`;
+      scheduleRenderProducts();
     });
 
     // Checkboxes change listeners
@@ -2007,6 +2458,14 @@ document.addEventListener("DOMContentLoaded", () => {
     elements.resetFiltersBtn.addEventListener("click", resetAllFilters);
     elements.resetFiltersBtnEmpty.addEventListener("click", resetAllFilters);
 
+    // A dropped first request leaves the grid in its error state; retry in place.
+    elements.retryProductsBtn.addEventListener("click", async () => {
+      await loadProducts();
+      renderProducts();
+      updateCategoryCounts();
+      pruneCartOfDeletedProducts();
+    });
+
     // Promo Code Application click
     elements.applyPromoBtn.addEventListener("click", () => {
       const code = elements.promoInput.value.toUpperCase().trim();
@@ -2018,6 +2477,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       if (code === "DAVINCI10" || code === "LUXE10") {
         currentPromo = { code: code, type: "percentage", value: 0.1 };
+        writePromo();
         elements.promoFeedbackMsg.className = "promo-feedback-msg success";
         elements.promoFeedbackMsg.innerText = "تم تطبيق خصم 10% بنجاح!";
         calculateCartTotals();
@@ -2066,7 +2526,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Checkout Modal open click
     elements.checkoutBtn.addEventListener("click", () => {
-      if (cart.length === 0) return;
+      pruneCartOfDeletedProducts();
+      if (cart.length === 0) {
+        showToastNotification("السلة فارغة، أضف منتجاً أولاً", "error");
+        return;
+      }
       showCheckoutStep(1);
       openDrawerElement(elements.checkoutModal);
     });
@@ -2096,11 +2560,12 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     elements.coNextStep2.addEventListener("click", () => {
-      // Validate card form if card payment selected
-      let selectedMethod = "cod";
-      elements.paymentMethods.forEach(method => {
-        if (method.checked) selectedMethod = method.value;
-      });
+      // Validate the chosen payment method before moving on
+      const selectedMethod = getChosenPaymentMethod();
+      if (!selectedMethod) {
+        showToastNotification("لا توجد طريقة دفع متاحة حالياً، نعتذر عن ذلك", "error");
+        return;
+      }
 
       if (selectedMethod === "card") {
         const name = document.getElementById("coCardName");
@@ -2174,7 +2639,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
               // Clear Cart state completely — only on success
               cart = [];
-              localStorage.removeItem("davinci_store_cart");
+              currentPromo = null;
+              writePromo();
               updateCartUI();
 
               // Trigger Confetti and success modal
@@ -2183,21 +2649,12 @@ document.addEventListener("DOMContentLoaded", () => {
               updateScrollLock();
           } else {
               closeCheckout();
-              const msg = data.error || "تعذر إتمام الطلب، حاول مرة أخرى";
-              if (typeof showToastNotification === 'function') {
-                  showToastNotification(msg);
-              } else {
-                  alert(msg);
-              }
+              showToastNotification(data.error || "تعذر إتمام الطلب، حاول مرة أخرى", "error");
           }
       } catch(err) {
           console.error("Order request error:", err);
           closeCheckout();
-          if (typeof showToastNotification === 'function') {
-              showToastNotification("تعذر الاتصال بالخادم، تحقق من اتصالك وحاول مرة أخرى");
-          } else {
-              alert("تعذر الاتصال بالخادم، تحقق من اتصالك وحاول مرة أخرى");
-          }
+          showToastNotification("تعذر الاتصال بالخادم، تحقق من اتصالك وحاول مرة أخرى", "error");
       }
     }
 
@@ -2222,6 +2679,7 @@ document.addEventListener("DOMContentLoaded", () => {
               <div class="form-group">
                 <label for="otpCode" style="text-align: center; font-weight: bold; margin-bottom: 5px;">رمز التحقق المرسل</label>
                 <input type="text" id="otpCode" placeholder="******" required style="text-align: center; font-size: 1.3rem; letter-spacing: 6px; padding: 12px;" maxlength="6">
+                <span class="field-error" id="otpError" role="alert"></span>
                 <span class="field-help" style="text-align: center; color: var(--color-success); font-size:0.8rem; margin-top: 5px; display:block;">للمحاكاة والقبول، أدخل الرمز: <strong>123456</strong></span>
               </div>
               <button type="submit" class="btn btn-primary w-100" id="submitOtpBtn">تأكيد الدفع وسحب المبلغ <i class="fa-solid fa-lock"></i></button>
@@ -2348,11 +2806,22 @@ document.addEventListener("DOMContentLoaded", () => {
         const cardOtpForm = document.getElementById('cardOtpForm');
         if (cardOtpForm) {
           cardOtpForm.addEventListener('submit', () => {
-            const codeVal = document.getElementById('otpCode').value.trim();
+            const otpInput = document.getElementById('otpCode');
+            const otpErr = document.getElementById('otpError');
+            const codeVal = otpInput.value.trim();
             if (codeVal !== '123456') {
-              alert('رمز التحقق (OTP) غير صحيح! يرجى إدخال الرقم 123456 للقبول والمحاكاة.');
+              if (otpErr) {
+                otpErr.textContent = 'رمز التحقق غير صحيح، حاول مرة أخرى';
+                otpErr.classList.remove('is-shaking');
+                void otpErr.offsetWidth;
+                otpErr.classList.add('is-shaking');
+              }
+              otpInput.classList.add('input-error');
+              otpInput.focus();
               return;
             }
+            if (otpErr) { otpErr.textContent = ''; otpErr.classList.remove('is-shaking'); }
+            otpInput.classList.remove('input-error');
 
             // Capture card dummy info
             orderPayload.payment_sender = "Visa/Mastercard (الدفع الآمن)";
@@ -2423,16 +2892,33 @@ document.addEventListener("DOMContentLoaded", () => {
     elements.checkoutForm.addEventListener("submit", async (e) => {
       e.preventDefault();
 
-      let selectedMethod = "cod";
-      const methods = document.getElementsByName("paymentMethod");
-      methods.forEach(m => {
-        if (m.checked) selectedMethod = m.value;
-      });
+      const selectedMethod = getChosenPaymentMethod();
+      if (!selectedMethod) {
+        showToastNotification("لا توجد طريقة دفع متاحة حالياً، نعتذر عن ذلك", "error");
+        return;
+      }
 
-      const subtotal = cart.reduce((sum, item) => {
-        const prod = products.find(p => String(p.id) === String(item.productId));
-        return sum + (prod ? prod.price * item.quantity : 0);
-      }, 0);
+      const validCartItems = cart
+        .map(item => {
+          const prod = products.find(p => String(p.id) === String(item.productId));
+          if (!prod) return null;
+          return {
+              product_id: item.productId,
+              name: prod.name,
+              quantity: item.quantity,
+              price: prod.price,
+              size: String(item.size || 'N/A'),
+              color: item.color && item.color.name ? item.color.name : 'افتراضي'
+          };
+        })
+        .filter(Boolean);
+
+      if (validCartItems.length === 0) {
+        showToastNotification("السلة فارغة، أضف منتجاً أولاً", "error");
+        return;
+      }
+
+      const subtotal = validCartItems.reduce((sum, item) => sum + (parseFloat(item.price) || 0) * item.quantity, 0);
 
       let discount = 0;
       if (currentPromo && currentPromo.type === "percentage") {
@@ -2452,17 +2938,7 @@ document.addEventListener("DOMContentLoaded", () => {
           discount: discount,
           total: total,
           promo_code: currentPromo ? currentPromo.code : undefined,
-          items: cart.map(item => {
-              const p = products.find(prod => String(prod.id) === String(item.productId));
-              return {
-                  product_id: item.productId,
-                  name: p ? p.name : 'منتج غير معروف',
-                  quantity: item.quantity,
-                  price: p ? p.price : 0,
-                  size: String(item.size || 'N/A'),
-                  color: item.color && item.color.name ? item.color.name : 'افتراضي'
-              };
-          })
+          items: validCartItems
       };
 
       if (selectedMethod === "cod") {
@@ -2513,9 +2989,10 @@ document.addEventListener("DOMContentLoaded", () => {
             if (res.ok) {
                 userToken = data.token;
                 localStorage.setItem("userToken", userToken);
+                applyScopeAfterLogin();
                 closeAuth();
                 updateAuthStateUI();
-                alert("تم تسجيل الدخول بحساب جوجل بنجاح");
+                showToastNotification("تم تسجيل الدخول بحساب جوجل بنجاح", "success");
             } else {
                 if (errEl) errEl.innerText = data.error || "خطأ أثناء تسجيل الدخول بجوجل";
             }
@@ -2558,88 +3035,14 @@ document.addEventListener("DOMContentLoaded", () => {
         updateAuthStateUI();
     });
 
-    document.getElementById("mockGoogleLoginBtn").addEventListener("click", async () => {
-        const mockEmail = `test.user.${Math.floor(Math.random()*10000)}@gmail.com`;
-        const mockName = `عميل نخبة تجريبي (${Math.floor(Math.random()*1000)})`;
-        const errEl = document.getElementById("userLoginError");
-        if (errEl) errEl.innerText = "";
-        
-        try {
-            const res = await fetch(`${API_BASE}/auth/google`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ 
-                    isMock: true, 
-                    mockData: {
-                        email: mockEmail,
-                        name: mockName,
-                        picture: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&h=150&q=80"
-                    }
-                })
-            });
-            const data = await res.json();
-            if (res.ok) {
-                userToken = data.token;
-                localStorage.setItem("userToken", userToken);
-                closeAuth();
-                updateAuthStateUI();
-                alert("تم تسجيل الدخول التجريبي بنجاح");
-            } else {
-                if (errEl) errEl.innerText = data.error || "خطأ في الدخول التجريبي";
-            }
-        } catch (err) {
-            if (errEl) errEl.innerText = "خطأ في الاتصال بالخادم";
-        }
-    });
-
     document.getElementById("userLogoutBtn").addEventListener("click", () => {
         userToken = null;
         localStorage.removeItem("userToken");
+        applyScopeAfterLogout();
         closeAuth();
         updateAuthStateUI();
-        alert("تم تسجيل الخروج بنجاح");
+        showToastNotification("تم تسجيل الخروج", "info");
     });
-
-
-
-
-
-    function showToastNotification(message) {
-        let toast = document.getElementById('globalToastNotification');
-        if (!toast) {
-            toast = document.createElement('div');
-            toast.id = 'globalToastNotification';
-            toast.style.cssText = `
-                position: fixed;
-                top: 30px;
-                left: 50%;
-                transform: translateX(-50%) translateY(-20px);
-                background: linear-gradient(135deg, rgba(20, 20, 20, 0.95), rgba(30, 30, 30, 0.95));
-                color: var(--color-gold);
-                border: 1px solid var(--color-gold);
-                padding: 14px 30px;
-                border-radius: 40px;
-                font-weight: 700;
-                font-size: 0.95rem;
-                box-shadow: 0 12px 35px rgba(0,0,0,0.6), 0 0 25px rgba(212,175,55,0.3);
-                backdrop-filter: blur(12px);
-                z-index: 10000;
-                opacity: 0;
-                transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-                pointer-events: none;
-                text-align: center;
-            `;
-            document.body.appendChild(toast);
-        }
-        toast.innerText = message;
-        toast.style.opacity = '1';
-        toast.style.transform = 'translateX(-50%) translateY(0)';
-
-        setTimeout(() => {
-            toast.style.opacity = '0';
-            toast.style.transform = 'translateX(-50%) translateY(-20px)';
-        }, 3500);
-    }
 
 
     // ── STORE COMMENTS LOGIC ─────────────────────────────────────────
@@ -2787,15 +3190,15 @@ document.addEventListener("DOMContentLoaded", () => {
                         commentStarPicker.querySelectorAll('i').forEach(s => s.classList.add('active'));
                     }
 
-                    showToastNotification("✨ تم إرسال تعليقك بنجاح! شكراً لمشاركتك.");
+                    showToastNotification("تم إرسال تعليقك بنجاح! شكراً لمشاركتك.", "success");
                     await loadStoreComments();
                 } else {
                     const data = await res.json().catch(() => ({}));
-                    showToastNotification('❌ ' + (data.error || 'حدث خطأ أثناء إرسال التعليق'));
+                    showToastNotification(data.error || 'حدث خطأ أثناء إرسال التعليق', 'error');
                 }
             } catch (err) {
                 console.error('[Comments] Post error:', err);
-                showToastNotification('❌ خطأ في الاتصال بالخادم.');
+                showToastNotification('خطأ في الاتصال بالخادم.', 'error');
             } finally {
                 if (submitBtn) submitBtn.disabled = false;
             }
@@ -2803,6 +3206,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // Initial load
+    refreshComments = loadStoreComments;
     loadStoreComments();
 
     // Global ESC Key Handler to close drawers, modals, and search suggestions

@@ -12,7 +12,7 @@ let adminScrollLockY = 0;
 
 function updateAdminScrollLock() {
     const overlayOpen = !!document.querySelector(
-        ".modal.active, .admin-sidebar.active, .checkout-modal.active"
+        ".modal.active, .admin-sidebar.active, .checkout-modal.active, .admin-confirm.is-open"
     );
 
     if (overlayOpen && !adminScrollLocked) {
@@ -32,6 +32,167 @@ function updateAdminScrollLock() {
         window.scrollTo(0, adminScrollLockY);
         html.style.scrollBehavior = prev;
     }
+}
+
+// ─── Non-blocking feedback (toasts + confirm dialog) ────────────────────────
+// alert() and confirm() pause the whole UI thread and render as raw browser
+// popups; every admin message goes through these DOM components instead.
+const TOAST_META = {
+    success: { icon: 'fa-circle-check', cls: 'is-success' },
+    error: { icon: 'fa-triangle-exclamation', cls: 'is-error' },
+    info: { icon: 'fa-circle-info', cls: 'is-info' }
+};
+let adminToastHost = null;
+
+function notify(message, type = 'info', duration = 3400) {
+    if (!adminToastHost) {
+        adminToastHost = document.createElement('div');
+        adminToastHost.id = 'adminToastHost';
+        adminToastHost.className = 'admin-toast-host';
+        adminToastHost.setAttribute('role', 'status');
+        adminToastHost.setAttribute('aria-live', 'polite');
+        document.body.appendChild(adminToastHost);
+    }
+
+    const meta = TOAST_META[type] || TOAST_META.info;
+    const toast = document.createElement('div');
+    toast.className = `admin-toast ${meta.cls}`;
+    const icon = document.createElement('i');
+    icon.className = `fa-solid ${meta.icon}`;
+    const text = document.createElement('span');
+    text.textContent = String(message ?? '');
+    toast.append(icon, text);
+    adminToastHost.appendChild(toast);
+    toast.classList.add('is-in');
+
+    let dismissed = false;
+    const dismiss = () => {
+        if (dismissed) return;
+        dismissed = true;
+        toast.classList.remove('is-in');
+        toast.classList.add('is-out');
+        setTimeout(() => toast.remove(), 280);
+    };
+    setTimeout(dismiss, duration);
+    toast.addEventListener('click', dismiss);
+}
+
+let adminConfirmEl = null;
+let adminConfirmResolve = null;
+let adminConfirmRestoreFocus = null;
+
+function settleAdminConfirm(value) {
+    if (!adminConfirmEl) return;
+    const wasOpen = adminConfirmEl.classList.contains('is-open');
+    const resolve = adminConfirmResolve;
+    if (!wasOpen && !resolve) return;
+    adminConfirmEl.classList.remove('is-open');
+    adminConfirmResolve = null;
+    if (adminConfirmRestoreFocus?.focus) adminConfirmRestoreFocus.focus();
+    adminConfirmRestoreFocus = null;
+    updateAdminScrollLock();
+    if (resolve) resolve(value);
+}
+
+function onAdminConfirmKeydown(e) {
+    if (!adminConfirmEl || !adminConfirmEl.classList.contains('is-open')) return;
+    if (e.key === 'Escape') {
+        e.preventDefault();
+        settleAdminConfirm(false);
+        return;
+    }
+    if (e.key !== 'Tab') return;
+    const buttons = [...adminConfirmEl.querySelectorAll('button')];
+    if (!buttons.length) return;
+    const first = buttons[0];
+    const last = buttons[buttons.length - 1];
+    if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+    }
+}
+
+function ensureAdminConfirm() {
+    if (adminConfirmEl) return adminConfirmEl;
+    adminConfirmEl = document.createElement('div');
+    adminConfirmEl.className = 'admin-confirm';
+    adminConfirmEl.setAttribute('role', 'dialog');
+    adminConfirmEl.setAttribute('aria-modal', 'true');
+    adminConfirmEl.innerHTML = `
+        <div class="admin-confirm-backdrop"></div>
+        <div class="admin-confirm-card">
+            <i class="fa-solid fa-triangle-exclamation admin-confirm-icon" aria-hidden="true"></i>
+            <h3 class="admin-confirm-title"></h3>
+            <p class="admin-confirm-message"></p>
+            <div class="admin-confirm-actions">
+                <button type="button" class="btn btn-secondary admin-confirm-cancel"></button>
+                <button type="button" class="btn btn-primary admin-confirm-ok"></button>
+            </div>
+        </div>`;
+    document.body.appendChild(adminConfirmEl);
+    adminConfirmEl.querySelector('.admin-confirm-backdrop').addEventListener('click', () => settleAdminConfirm(false));
+    adminConfirmEl.querySelector('.admin-confirm-cancel').addEventListener('click', () => settleAdminConfirm(false));
+    adminConfirmEl.querySelector('.admin-confirm-ok').addEventListener('click', () => settleAdminConfirm(true));
+    document.addEventListener('keydown', onAdminConfirmKeydown, true);
+    return adminConfirmEl;
+}
+
+function confirmAction(options) {
+    const o = typeof options === 'string' ? { message: options } : (options || {});
+    // A second question supersedes the first one rather than stacking on top of it.
+    settleAdminConfirm(false);
+
+    const el = ensureAdminConfirm();
+    el.querySelector('.admin-confirm-title').textContent = o.title || 'تأكيد الإجراء';
+    el.querySelector('.admin-confirm-message').textContent = o.message || 'هل تريد المتابعة؟';
+    const okBtn = el.querySelector('.admin-confirm-ok');
+    const cancelBtn = el.querySelector('.admin-confirm-cancel');
+    okBtn.textContent = o.confirmText || 'تأكيد';
+    cancelBtn.textContent = o.cancelText || 'إلغاء';
+    el.querySelector('.admin-confirm-icon').classList.toggle('is-danger', !!o.danger);
+    okBtn.classList.toggle('btn-danger-solid', !!o.danger);
+
+    adminConfirmRestoreFocus = document.activeElement;
+    el.classList.add('is-open');
+    okBtn.focus({ preventScroll: true });
+    updateAdminScrollLock();
+    return new Promise(resolve => { adminConfirmResolve = resolve; });
+}
+
+function setButtonBusy(btn, busy) {
+    if (!btn) return;
+    if (busy) {
+        if (!btn.dataset.idleHtml) btn.dataset.idleHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin" aria-hidden="true"></i>';
+    } else if (btn.dataset.idleHtml) {
+        btn.disabled = false;
+        btn.innerHTML = btn.dataset.idleHtml;
+    }
+}
+
+// A slow save used to be silently double-clickable into two writes.
+async function withBusy(btn, fn) {
+    if (!btn) return fn();
+    setButtonBusy(btn, true);
+    try {
+        return await fn();
+    } finally {
+        setButtonBusy(btn, false);
+    }
+}
+
+// Reports the failure paths callers previously swallowed.
+function reportSaveFailure(res) {
+    if (res === 401 || res === 403) {
+        notify('انتهت صلاحية الجلسة، يرجى إعادة تسجيل الدخول.', 'error');
+        forceLogout();
+        return;
+    }
+    notify('تعذر الحفظ، تحقق من الاتصال', 'error');
 }
 
 // ─── Session Timeout (10 minutes inactivity auto-logout) ──────────────────
@@ -269,27 +430,30 @@ loginForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const username = document.getElementById('loginUsername').value;
     const password = document.getElementById('loginPassword').value;
-    
-    try {
-        const res = await fetch(`${API_URL}/auth/login`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, password })
-        });
-        const data = await res.json();
-        
-        if (res.ok && data.role === 'admin') {
-            authToken = data.token;
-            localStorage.setItem('adminToken', authToken);
-            localStorage.setItem('authToken', authToken);
-            if (loginError) loginError.textContent = '';
-            showDashboard();
-        } else {
-            loginError.textContent = data.error || 'غير مصرح لك بالدخول';
+    const submitBtn = loginForm.querySelector('button[type="submit"]');
+
+    await withBusy(submitBtn, async () => {
+        try {
+            const res = await fetch(`${API_URL}/auth/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+            const data = await res.json();
+
+            if (res.ok && data.role === 'admin') {
+                authToken = data.token;
+                localStorage.setItem('adminToken', authToken);
+                localStorage.setItem('authToken', authToken);
+                if (loginError) loginError.textContent = '';
+                showDashboard();
+            } else {
+                loginError.textContent = data.error || 'غير مصرح لك بالدخول';
+            }
+        } catch (err) {
+            loginError.textContent = 'خطأ في الاتصال بالخادم';
         }
-    } catch (err) {
-        loginError.textContent = 'خطأ في الاتصال بالخادم';
-    }
+    });
 });
 
 logoutBtn.addEventListener('click', () => {
@@ -332,6 +496,31 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+    // ─── Live sync: data changed on another device → refresh what is on screen ───
+    if (typeof EventSource !== 'undefined') {
+        const stream = new EventSource(`${API_URL}/events`);
+        const topicViews = { products: 'productsView', categories: 'categoriesView', reviews: 'commentsAdminView', orders: 'ordersView' };
+
+        stream.addEventListener('update', (e) => {
+            let topic = '';
+            try { topic = JSON.parse(e.data).topic; } catch (err) { return; }
+
+            const viewId = topicViews[topic];
+            if (!viewId) return;
+            const view = document.getElementById(viewId);
+            if (!view || view.style.display === 'none') return;
+
+            if (topic === 'products') fetchProductsAdmin();
+            else if (topic === 'categories') fetchCategoriesAdmin();
+            else if (topic === 'reviews') fetchCommentsAdmin();
+            else if (topic === 'orders') fetchOrders();
+        });
+
+        stream.addEventListener('error', () => {
+            if (stream.readyState === EventSource.CLOSED) stream.close();
+        });
+    }
+
     // Global ESC Key Handler for Admin Modals
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape' || e.keyCode === 27) {
@@ -349,29 +538,35 @@ accountForm.addEventListener('submit', async (e) => {
     const newPassword = document.getElementById('accPassword').value;
     const currentPassword = document.getElementById('accCurrentPassword').value;
     const feedback = document.getElementById('accountFeedback');
-    
-    try {
-        const res = await fetch(`${API_URL}/auth/update`, {
-            method: 'PUT',
-            headers: { 
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${authToken}`
-            },
-            body: JSON.stringify({ newUsername, newPassword: newPassword || undefined, currentPassword })
-        });
-        const data = await res.json();
-        
-        if (res.ok) {
-            feedback.style.color = '';
-            feedback.textContent = 'تم تحديث بيانات الدخول بنجاح. قد تحتاج لتسجيل الدخول مجدداً.';
-            setTimeout(() => { logoutBtn.click(); }, 3000);
-        } else {
-            feedback.textContent = data.error || 'حدث خطأ';
-            feedback.style.color = 'var(--color-danger)';
+    const submitBtn = accountForm.querySelector('button[type="submit"]');
+
+    await withBusy(submitBtn, async () => {
+        try {
+            const res = await fetch(`${API_URL}/auth/update`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${authToken}`
+                },
+                body: JSON.stringify({ newUsername, newPassword: newPassword || undefined, currentPassword })
+            });
+            const data = await res.json();
+
+            if (res.ok) {
+                feedback.style.color = '';
+                feedback.textContent = 'تم تحديث بيانات الدخول بنجاح. قد تحتاج لتسجيل الدخول مجدداً.';
+                notify('تم تحديث بيانات الدخول.', 'success', 3000);
+                setTimeout(() => { logoutBtn.click(); }, 3000);
+            } else {
+                feedback.textContent = data.error || 'حدث خطأ';
+                feedback.style.color = 'var(--color-danger)';
+                notify(data.error || 'تعذر تحديث بيانات الدخول', 'error');
+            }
+        } catch (err) {
+            console.error(err);
+            notify('خطأ في الاتصال بالخادم.', 'error');
         }
-    } catch (err) {
-        console.error(err);
-    }
+    });
 });
 
 // --- Settings Management ---
@@ -488,55 +683,62 @@ async function fetchSettings() {
     } catch(err) { console.error(err); }
 }
 
-async function saveAnnouncementSettings() {
+async function saveAnnouncementSettings(btn) {
     const inputs = document.querySelectorAll('.announcement-input-val');
     const texts = Array.from(inputs).map(inp => inp.value.trim()).filter(Boolean);
     const enabled = document.getElementById('setAnnouncementEnabled').checked;
-    const feedback = document.getElementById('announcementFeedback');
 
-    try {
-        const res = await fetch(`${API_URL}/settings`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
-            body: JSON.stringify({ 
-                announcement_text: JSON.stringify(texts), 
-                announcement_enabled: enabled.toString() 
-            })
-        });
-        if (res.ok) {
-            feedback.style.color = 'var(--color-success)';
-            feedback.textContent = '✅ تم حفظ الإعلانات بنجاح';
-        } else {
-            const d = await res.json();
-            if (res.status === 401 || res.status === 403) { forceLogout(); return; }
-            feedback.style.color = 'var(--color-danger)';
-            feedback.textContent = d.error || 'حدث خطأ';
+    await withBusy(btn, async () => {
+        try {
+            const res = await fetch(`${API_URL}/settings`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+                body: JSON.stringify({
+                    announcement_text: JSON.stringify(texts),
+                    announcement_enabled: enabled.toString()
+                })
+            });
+            if (res.ok) {
+                notify('تم حفظ الإعلانات', 'success');
+            } else {
+                reportSaveFailure(res.status);
+            }
+        } catch(err) {
+            console.error(err);
+            notify('خطأ في الاتصال بالخادم.', 'error');
         }
-    } catch(err) {
-        feedback.textContent = 'خطأ في الاتصال';
-    }
-    setTimeout(() => { feedback.textContent = ''; }, 3500);
+    });
 }
 
-async function clearAnnouncement() {
-    if (!confirm('هل تريد حذف جميع الإعلانات وإخفاء الشريط؟')) return;
-    const feedback = document.getElementById('announcementFeedback');
-    try {
-        const res = await fetch(`${API_URL}/settings`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
-            body: JSON.stringify({ announcement_text: '[]', announcement_enabled: 'false' })
-        });
-        if (res.ok) {
-            const container = document.getElementById('announcementRowsContainer');
-            if (container) container.innerHTML = '';
-            addAnnouncementRow('');
-            document.getElementById('setAnnouncementEnabled').checked = false;
-            feedback.style.color = 'var(--color-success)';
-            feedback.textContent = '✅ تم حذف جميع الإعلانات';
-        } else if (res.status === 401 || res.status === 403) { forceLogout(); return; }
-    } catch(err) { feedback.textContent = 'خطأ في الاتصال'; }
-    setTimeout(() => { feedback.textContent = ''; }, 3500);
+async function clearAnnouncement(btn) {
+    const ok = await confirmAction({
+        title: 'حذف الإعلانات',
+        message: 'هل تريد حذف جميع الإعلانات وإخفاء الشريط؟',
+        confirmText: 'حذف الكل',
+        danger: true
+    });
+    if (!ok) return;
+    await withBusy(btn, async () => {
+        try {
+            const res = await fetch(`${API_URL}/settings`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+                body: JSON.stringify({ announcement_text: '[]', announcement_enabled: 'false' })
+            });
+            if (res.ok) {
+                const container = document.getElementById('announcementRowsContainer');
+                if (container) container.innerHTML = '';
+                addAnnouncementRow('');
+                document.getElementById('setAnnouncementEnabled').checked = false;
+                notify('تم حذف جميع الإعلانات.', 'success');
+            } else {
+                reportSaveFailure(res.status);
+            }
+        } catch (err) {
+            console.error(err);
+            notify('خطأ في الاتصال بالخادم.', 'error');
+        }
+    });
 }
 
 paymentSettingsForm.addEventListener('submit', async (e) => {
@@ -547,21 +749,27 @@ paymentSettingsForm.addEventListener('submit', async (e) => {
         ewallets: document.getElementById('setEwallets').value,
         cash_on_delivery_enabled: document.getElementById('setCod').checked
     };
-    
-    try {
-        const res = await fetch(`${API_URL}/settings`, {
-            method: 'PUT',
-            headers: { 
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${authToken}`
-            },
-            body: JSON.stringify(payload)
-        });
-        if (res.ok) {
-            document.getElementById('settingsFeedback').textContent = 'تم حفظ الإعدادات بنجاح';
-            setTimeout(() => { document.getElementById('settingsFeedback').textContent = ''; }, 3000);
+
+    await withBusy(paymentSettingsForm.querySelector('button[type="submit"]'), async () => {
+        try {
+            const res = await fetch(`${API_URL}/settings`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${authToken}`
+                },
+                body: JSON.stringify(payload)
+            });
+            if (res.ok) {
+                notify('تم حفظ إعدادات الدفع', 'success');
+            } else {
+                reportSaveFailure(res.status);
+            }
+        } catch (err) {
+            console.error(err);
+            notify('خطأ في الاتصال بالخادم.', 'error');
         }
-    } catch (err) { console.error(err); }
+    });
 });
 
 // --- Products Management ---
@@ -586,16 +794,29 @@ function renderAdminProducts() {
     grid.innerHTML = '';
     
     adminProducts.forEach(p => {
+        let sizes = [], colors = [];
+        try { sizes = Array.isArray(p.sizes) ? p.sizes : JSON.parse(p.sizes || '[]'); } catch(e) {}
+        try { colors = Array.isArray(p.colors) ? p.colors : JSON.parse(p.colors || '[]'); } catch(e) {}
+        
+        const sizeChips = sizes.map(s => `<span class="admin-chip">${escapeHtml(String(s))}</span>`).join('');
+        const colorDots = colors.map(c => `<span class="admin-color-dot" title="${escapeHtml(String(c.name || ''))}" style="background:${escapeHtml(String(c.code || '#888'))}"></span>`).join('');
+        
         grid.innerHTML += `
             <div class="admin-product-card">
                 <img src="${p.image}" class="admin-product-img">
                 <div class="admin-product-info">
                     <h4 style="font-size: 1rem; margin-bottom: 5px;">${p.name}</h4>
                     <p class="text-gold font-bold">${p.price} ج.م</p>
+                    <div class="admin-product-meta">
+                        <span class="admin-sku">SKU: DV-${p.id}</span>
+                        <span class="admin-stock ${p.inStock ? 'in' : 'out'}">${p.inStock ? 'متوفر' : 'غير متوفر'}</span>
+                    </div>
+                    ${sizeChips ? `<div class="admin-chips">${sizeChips}</div>` : ''}
+                    ${colorDots ? `<div class="admin-dots">${colorDots}</div>` : ''}
                 </div>
                 <div class="admin-product-actions">
                     <button class="btn btn-outline" style="flex:1; padding: 5px;" onclick="editProduct(${p.id})"><i class="fa-solid fa-pen"></i> تعديل</button>
-                    <button class="btn btn-secondary" style="flex:1; padding: 5px; color: var(--color-danger); border-color: var(--color-danger);" onclick="deleteProduct(${p.id})"><i class="fa-solid fa-trash"></i> حذف</button>
+                    <button class="btn btn-secondary" style="flex:1; padding: 5px; color: var(--color-danger); border-color: var(--color-danger);" onclick="deleteProduct(${p.id}, this)"><i class="fa-solid fa-trash"></i> حذف</button>
                 </div>
             </div>
         `;
@@ -727,6 +948,7 @@ function editProduct(id) {
     document.getElementById('prodDesc').value = p.description;
     
     document.getElementById('prodSizes').value = p.sizes ? p.sizes.join(', ') : '';
+    document.getElementById('prodMaterial').value = p.material || '';
     setColorWidget(1, p.colors && p.colors[0] ? p.colors[0] : null);
     setColorWidget(2, p.colors && p.colors[1] ? p.colors[1] : null);
     
@@ -757,9 +979,12 @@ productForm.addEventListener('submit', async (e) => {
     
     const fileInput = document.getElementById('prodImageFiles');
     if (!id && fileInput.files.length === 0) {
-        alert('يرجى تحميل صورة واحدة على الأقل للمنتج الجديد.');
+        notify('يرجى تحميل صورة واحدة على الأقل للمنتج الجديد.', 'error');
         return;
     }
+
+    const submitBtn = productForm.querySelector('button[type="submit"]');
+    setButtonBusy(submitBtn, true);
     
     const formData = new FormData();
     formData.append('name', document.getElementById('prodName').value);
@@ -770,6 +995,7 @@ productForm.addEventListener('submit', async (e) => {
     formData.append('description', document.getElementById('prodDesc').value);
     formData.append('sizes', JSON.stringify(sizes));
     formData.append('colors', JSON.stringify(colors));
+    formData.append('material', document.getElementById('prodMaterial').value);
     formData.append('inStock', document.getElementById('prodInStock').checked ? 'true' : 'false');
     formData.append('featured', document.getElementById('prodFeatured').checked ? 'true' : 'false');
     formData.append('existingImages', document.getElementById('prodImage').value || '[]');
@@ -789,31 +1015,51 @@ productForm.addEventListener('submit', async (e) => {
         });
         if (res.ok) {
             closeProductModal();
+            notify(id ? 'تم تحديث المنتج بنجاح' : 'تم إضافة المنتج بنجاح', 'success');
             fetchProductsAdmin();
         } else {
             if (res.status === 401 || res.status === 403) {
-                alert('انتهت صلاحية الجلسة، يرجى إعادة تسجيل الدخول.');
+                notify('انتهت صلاحية الجلسة، يرجى إعادة تسجيل الدخول.', 'error');
                 forceLogout();
                 return;
             }
             const data = await res.json();
-            alert(data.error || 'حدث خطأ أثناء حفظ المنتج.');
+            notify(data.error || 'حدث خطأ أثناء حفظ المنتج.', 'error');
         }
     } catch(err) { 
         console.error(err); 
-        alert('خطأ في الاتصال بالخادم.');
+        notify('خطأ في الاتصال بالخادم.', 'error');
+    } finally {
+        setButtonBusy(submitBtn, false);
     }
 });
 
-async function deleteProduct(id) {
-    if(!confirm('هل أنت متأكد من حذف هذا المنتج نهائياً؟')) return;
+async function deleteProduct(id, triggerBtn) {
+    const ok = await confirmAction({
+        title: 'حذف منتج',
+        message: 'هل أنت متأكد من حذف هذا المنتج نهائياً؟',
+        confirmText: 'حذف',
+        danger: true
+    });
+    if (!ok) return;
+    setButtonBusy(triggerBtn, true);
     try {
         const res = await fetch(`${API_URL}/products/${id}`, {
             method: 'DELETE',
             headers: { 'Authorization': `Bearer ${authToken}` }
         });
-        if (res.ok) fetchProductsAdmin();
-    } catch(err) { console.error(err); }
+        if (res.ok) {
+            notify('تم حذف المنتج', 'success');
+            fetchProductsAdmin();
+        } else {
+            setButtonBusy(triggerBtn, false);
+            notify('فشل حذف المنتج', 'error');
+        }
+    } catch(err) {
+        console.error(err);
+        setButtonBusy(triggerBtn, false);
+        notify('خطأ في الاتصال بالخادم.', 'error');
+    }
 }
 
 // --- Orders Management ---
@@ -888,16 +1134,16 @@ function renderOrders() {
         if (tbody) {
             tbody.innerHTML += `
                 <tr>
-                    <td><strong>${o.order_number}</strong></td>
+                    <td><strong>${escapeHtml(o.order_number)}</strong></td>
                     <td>${date}</td>
-                    <td>${o.customer_name}</td>
+                    <td>${escapeHtml(o.customer_name)}</td>
                     <td class="text-gold font-bold">${totalFormatted} ج.م</td>
                     <td>${getPaymentMethodName(o.payment_method)}</td>
                     <td>${statusBadge}</td>
                     <td>
                         <div style="display: flex; gap: 6px;">
                             <button class="btn btn-outline" style="padding: 5px 8px; font-size: 0.85rem;" onclick="viewOrder(${o.id})" title="عرض التفاصيل"><i class="fa-solid fa-eye"></i> عرض</button>
-                            <button class="btn btn-secondary" style="padding: 5px 8px; font-size: 0.85rem; color: var(--color-danger); border-color: var(--color-danger);" onclick="deleteOrder(${o.id})" title="حذف الطلب"><i class="fa-solid fa-trash"></i></button>
+                            <button class="btn btn-secondary" style="padding: 5px 8px; font-size: 0.85rem; color: var(--color-danger); border-color: var(--color-danger);" onclick="deleteOrder(${o.id}, this)" title="حذف الطلب"><i class="fa-solid fa-trash"></i></button>
                         </div>
                     </td>
                 </tr>
@@ -910,7 +1156,7 @@ function renderOrders() {
                     <div class="order-card-header">
                         <div class="order-num">
                             <i class="fa-solid fa-receipt text-gold"></i>
-                            <strong>${o.order_number}</strong>
+                            <strong>${escapeHtml(o.order_number)}</strong>
                         </div>
                         <div class="order-status-wrapper">
                             ${statusBadge}
@@ -919,15 +1165,15 @@ function renderOrders() {
                     <div class="order-card-body">
                         <div class="order-meta-item">
                             <span class="meta-label"><i class="fa-solid fa-user"></i> العميل:</span>
-                            <span class="meta-val">${o.customer_name}</span>
+                            <span class="meta-val">${escapeHtml(o.customer_name)}</span>
                         </div>
                         <div class="order-meta-item">
                             <span class="meta-label"><i class="fa-solid fa-phone"></i> الهاتف:</span>
-                            <span class="meta-val"><a href="tel:${o.phone}" style="color:var(--color-gold);text-decoration:none;">${o.phone}</a></span>
+                            <span class="meta-val"><a href="tel:${escapeHtml(o.phone)}" style="color:var(--color-gold);text-decoration:none;">${escapeHtml(o.phone)}</a></span>
                         </div>
                         <div class="order-meta-item">
                             <span class="meta-label"><i class="fa-solid fa-location-dot"></i> العنوان:</span>
-                            <span class="meta-val">${o.governorate || ''} - ${o.city || ''} (${o.address || ''})</span>
+                            <span class="meta-val">${escapeHtml(o.governorate || '')} - ${escapeHtml(o.city || '')} (${escapeHtml(o.address || '')})</span>
                         </div>
                         <div class="order-meta-item">
                             <span class="meta-label"><i class="fa-solid fa-credit-card"></i> طريقة الدفع:</span>
@@ -947,7 +1193,7 @@ function renderOrders() {
                             <button class="btn btn-outline" onclick="viewOrder(${o.id})">
                                 <i class="fa-solid fa-eye"></i> التفاصيل
                             </button>
-                            <button class="btn btn-outline danger" onclick="deleteOrder(${o.id})">
+                            <button class="btn btn-outline danger" onclick="deleteOrder(${o.id}, this)">
                                 <i class="fa-solid fa-trash"></i>
                             </button>
                         </div>
@@ -958,28 +1204,38 @@ function renderOrders() {
     });
 }
 
-async function deleteOrder(id) {
-    if (!confirm('هل أنت متأكد من حذف هذا الطلب نهائياً؟')) return;
+async function deleteOrder(id, triggerBtn) {
+    const ok = await confirmAction({
+        title: 'حذف طلب',
+        message: 'هل أنت متأكد من حذف هذا الطلب نهائياً؟',
+        confirmText: 'حذف',
+        danger: true
+    });
+    if (!ok) return;
+    setButtonBusy(triggerBtn, true);
     try {
         const res = await fetch(`${API_URL}/orders/${id}`, {
             method: 'DELETE',
             headers: { 'Authorization': `Bearer ${authToken}` }
         });
         if (res.ok) {
+            notify('تم حذف الطلب', 'success');
             fetchOrders();
         } else {
+            setButtonBusy(triggerBtn, false);
             const data = await res.json();
-            alert(data.error || 'حدث خطأ أثناء حذف الطلب.');
+            notify(data.error || 'حدث خطأ أثناء حذف الطلب.', 'error');
         }
     } catch(err) {
         console.error(err);
-        alert('خطأ في الاتصال بالخادم.');
+        setButtonBusy(triggerBtn, false);
+        notify('خطأ في الاتصال بالخادم.', 'error');
     }
 }
 
 function downloadOrdersPDF() {
     if (adminOrders.length === 0) {
-        alert('لا توجد طلبات لحفظها كـ PDF.');
+        notify('لا توجد طلبات لحفظها كـ PDF.', 'info');
         return;
     }
 
@@ -1072,9 +1328,9 @@ function downloadOrdersPDF() {
         
         rowsHtml += `
             <tr style="background-color: ${index % 2 === 0 ? '#ffffff' : '#f9fafb'}; border-bottom: 1px solid #e5e7eb;">
-                <td style="padding: 12px 10px; text-align: center; font-weight: 700; color: #111;">${o.order_number}</td>
+                <td style="padding: 12px 10px; text-align: center; font-weight: 700; color: #111;">${escapeHtml(o.order_number)}</td>
                 <td style="padding: 12px 10px; text-align: center; color: #4b5563;">${date}</td>
-                <td style="padding: 12px 10px; text-align: right; font-weight: 600; color: #1f2937;">${o.customer_name}</td>
+                <td style="padding: 12px 10px; text-align: right; font-weight: 600; color: #1f2937;">${escapeHtml(o.customer_name)}</td>
                 <td style="padding: 12px 10px; text-align: center; font-weight: bold; color: #D4AF37; font-size: 0.95rem;">${o.total.toLocaleString('ar-EG')} ج.م</td>
                 <td style="padding: 12px 10px; text-align: center;">
                     <span style="background-color: ${paymentBg}; color: ${paymentColor}; padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: bold;">
@@ -1181,9 +1437,9 @@ function viewOrder(id) {
     o.items.forEach(i => {
         itemsTbody.innerHTML += `
             <tr>
-                <td>${i.product_name}</td>
-                <td>${i.size || '-'}</td>
-                <td>${i.color || '-'}</td>
+                <td>${escapeHtml(i.product_name)}</td>
+                <td>${escapeHtml(i.size || '-')}</td>
+                <td>${escapeHtml(i.color || '-')}</td>
                 <td>${i.quantity}</td>
                 <td>${i.price} ج.م</td>
             </tr>
@@ -1200,6 +1456,7 @@ if (updateStatusBtn) {
     updateStatusBtn.addEventListener('click', async () => {
         if (!currentViewingOrderId) return;
         const newStatus = document.getElementById('moStatusSelect').value;
+        setButtonBusy(updateStatusBtn, true);
         try {
             const res = await fetch(`${API_URL}/orders/${currentViewingOrderId}/status`, {
                 method: 'PUT',
@@ -1210,16 +1467,18 @@ if (updateStatusBtn) {
                 body: JSON.stringify({ status: newStatus })
             });
             if (res.ok) {
-                alert('تم تحديث حالة الطلب بنجاح!');
+                notify('تم تحديث حالة الطلب بنجاح', 'success');
                 closeOrderModal();
                 fetchOrders();
             } else {
+                setButtonBusy(updateStatusBtn, false);
                 const data = await res.json();
-                alert(data.error || 'حدث خطأ أثناء تحديث حالة الطلب.');
+                notify(data.error || 'حدث خطأ أثناء تحديث حالة الطلب.', 'error');
             }
         } catch(err) {
             console.error(err);
-            alert('خطأ في الاتصال بالخادم.');
+            setButtonBusy(updateStatusBtn, false);
+            notify('خطأ في الاتصال بالخادم.', 'error');
         }
     });
 }
@@ -1304,7 +1563,7 @@ function renderCategoriesAdmin() {
                 <td><i class="fa-solid ${c.icon || 'fa-tag'}" style="color:var(--color-gold); font-size:1.05rem;"></i> <small style="color:var(--color-text-muted);">(${c.icon || 'fa-tag'})</small></td>
                 <td style="white-space: nowrap; width: 140px;">
                     <button class="btn btn-outline" style="padding:4px 10px; font-size:0.8rem; margin-left:4px;" onclick="editCategory(${c.id})"><i class="fa-solid fa-pen"></i> تعديل</button>
-                    <button class="btn btn-outline" style="padding:4px 10px; font-size:0.8rem; color:var(--color-danger); border-color:rgba(239,68,68,0.3);" onclick="deleteCategory(${c.id})"><i class="fa-solid fa-trash"></i> حذف</button>
+                    <button class="btn btn-outline" style="padding:4px 10px; font-size:0.8rem; color:var(--color-danger); border-color:rgba(239,68,68,0.3);" onclick="deleteCategory(${c.id}, this)"><i class="fa-solid fa-trash"></i> حذف</button>
                 </td>
             </tr>
         `;
@@ -1328,7 +1587,7 @@ function renderCategoriesAdmin() {
                 </div>
                 <div class="category-admin-card-actions">
                     <button class="btn btn-outline" style="padding:7px 12px; font-size:0.83rem;" onclick="editCategory(${c.id})"><i class="fa-solid fa-pen"></i> تعديل</button>
-                    <button class="btn btn-outline" style="padding:7px 12px; font-size:0.83rem; color:var(--color-danger); border-color:rgba(239,68,68,0.3);" onclick="deleteCategory(${c.id})"><i class="fa-solid fa-trash"></i> حذف</button>
+                    <button class="btn btn-outline" style="padding:7px 12px; font-size:0.83rem; color:var(--color-danger); border-color:rgba(239,68,68,0.3);" onclick="deleteCategory(${c.id}, this)"><i class="fa-solid fa-trash"></i> حذف</button>
                 </div>
             </div>
         `;
@@ -1467,7 +1726,11 @@ function editCategory(id) {
 async function handleCategoryFormSubmit(e) {
     e.preventDefault();
     const feedback = document.getElementById('catFeedback');
-    if (feedback) feedback.textContent = 'جاري الحفظ...';
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    if (feedback) {
+        feedback.style.color = 'var(--color-gold)';
+        feedback.textContent = 'جاري الحفظ...';
+    }
 
     const id = document.getElementById('catEditId').value;
     const key = document.getElementById('catKey').value.trim();
@@ -1488,53 +1751,69 @@ async function handleCategoryFormSubmit(e) {
     const url = id ? `${API_URL}/categories/${id}` : `${API_URL}/categories`;
     const method = id ? 'PUT' : 'POST';
 
-    try {
-        const res = await fetch(url, {
-            method,
-            headers: { 'Authorization': `Bearer ${authToken}` },
-            body: formData
-        });
-        const data = await res.json();
+    await withBusy(submitBtn, async () => {
+        try {
+            const res = await fetch(url, {
+                method,
+                headers: { 'Authorization': `Bearer ${authToken}` },
+                body: formData
+            });
+            const data = await res.json();
 
-        if (res.ok) {
-            if (feedback) {
-                feedback.style.color = '#10B981';
-                feedback.textContent = 'تم حفظ الفئة بنجاح!';
+            if (res.ok) {
+                if (feedback) {
+                    feedback.style.color = '#10B981';
+                    feedback.textContent = 'تم حفظ الفئة بنجاح!';
+                }
+                notify(id ? 'تم تعديل الفئة بنجاح.' : 'تمت إضافة الفئة بنجاح.', 'success');
+                setTimeout(() => {
+                    closeCategoryFormCard();
+                    fetchCategoriesAdmin();
+                }, 800);
+            } else {
+                if (feedback) {
+                    feedback.style.color = '#EF4444';
+                    feedback.textContent = data.error || 'فشل حفظ الفئة';
+                }
+                notify(data.error || 'فشل حفظ الفئة', 'error');
             }
-            setTimeout(() => {
-                closeCategoryFormCard();
-                fetchCategoriesAdmin();
-            }, 800);
-        } else {
+        } catch (err) {
+            console.error('handleCategoryFormSubmit error:', err);
             if (feedback) {
                 feedback.style.color = '#EF4444';
-                feedback.textContent = data.error || 'فشل حفظ الفئة';
+                feedback.textContent = 'حدث خطأ أثناء الاتصال بالسيرفر';
             }
+            notify('خطأ في الاتصال بالخادم.', 'error');
         }
-    } catch (err) {
-        console.error('handleCategoryFormSubmit error:', err);
-        if (feedback) {
-            feedback.style.color = '#EF4444';
-            feedback.textContent = 'حدث خطأ أثناء الاتصال بالسيرفر';
-        }
-    }
+    });
 }
 
-async function deleteCategory(id) {
-    if (!confirm('هل أنت متأكد من حذف هذه الفئة؟ سيتم حذفها أيضاً من سكشن الفئات في المتجر.')) return;
+async function deleteCategory(id, triggerBtn) {
+    const ok = await confirmAction({
+        title: 'حذف فئة',
+        message: 'هل أنت متأكد من حذف هذه الفئة؟ سيتم حذفها أيضاً من سكشن الفئات في المتجر.',
+        confirmText: 'حذف',
+        danger: true
+    });
+    if (!ok) return;
+    setButtonBusy(triggerBtn, true);
     try {
         const res = await fetch(`${API_URL}/categories/${id}`, {
             method: 'DELETE',
             headers: { 'Authorization': `Bearer ${authToken}` }
         });
         if (res.ok) {
+            notify('تم حذف الفئة', 'success');
             fetchCategoriesAdmin();
         } else {
+            setButtonBusy(triggerBtn, false);
             const data = await res.json();
-            alert(data.error || 'فشل حذف الفئة');
+            notify(data.error || 'فشل حذف الفئة', 'error');
         }
     } catch (err) {
         console.error(err);
+        setButtonBusy(triggerBtn, false);
+        notify('خطأ في الاتصال بالخادم.', 'error');
     }
 }
 
@@ -1573,42 +1852,37 @@ function applyThemeColor(color) {
     }
 }
 
-async function saveThemeColorSettings() {
+async function saveThemeColorSettings(btn) {
     let hex = document.getElementById('themeColorHex')?.value.trim();
-    const feedback = document.getElementById('themeColorFeedback');
     if (!hex || !/^#[0-9A-F]{6}$/i.test(hex)) {
         hex = '#D4AF37';
     }
     const modeRadio = document.querySelector('input[name="themeModeRadio"]:checked');
     const themeMode = modeRadio ? modeRadio.value : 'dark';
 
-    try {
-        const res = await fetch(`${API_URL}/settings`, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${authToken}`
-            },
-            body: JSON.stringify({ theme_color: hex, theme_mode: themeMode })
-        });
-        if (res.ok) {
-            if (feedback) {
-                feedback.className = 'feedback-msg success';
-                feedback.textContent = '✅ تم حفظ مظهر ونمط الألوان بنجاح!';
+    await withBusy(btn, async () => {
+        try {
+            const res = await fetch(`${API_URL}/settings`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${authToken}`
+                },
+                body: JSON.stringify({ theme_color: hex, theme_mode: themeMode })
+            });
+            if (res.ok) {
+                applyThemeColor(hex);
+                localStorage.setItem('theme_mode', themeMode);
+                applyThemeMode(themeMode);
+                notify('تم حفظ مظهر ونمط الألوان بنجاح!', 'success');
+            } else {
+                reportSaveFailure(res.status);
             }
-            applyThemeColor(hex);
-            localStorage.setItem('theme_mode', themeMode);
-            applyThemeMode(themeMode);
-        } else {
-            const data = await res.json();
-            if (feedback) {
-                feedback.className = 'feedback-msg error';
-                feedback.textContent = data.error || 'حدث خطأ أثناء الحفظ.';
-            }
+        } catch (err) {
+            console.error(err);
+            notify('خطأ في الاتصال بالخادم.', 'error');
         }
-    } catch (err) {
-        console.error(err);
-    }
+    });
 }
 
 function applyThemeMode(mode) {
@@ -1636,6 +1910,12 @@ async function uploadHeroImageFile(slideNum) {
     const formData = new FormData();
     formData.append('heroImage', fileInput.files[0]);
 
+    // Uploading is the slowest admin action; without feedback it reads as a freeze.
+    const preview = document.getElementById(`heroPreview${slideNum}`);
+    const wrap = preview && preview.parentElement;
+    if (wrap) wrap.classList.add('is-uploading');
+    notify('جارٍ رفع الصورة…', 'info', 8000);
+
     try {
         const res = await fetch(`${API_URL}/upload-hero-image`, {
             method: 'POST',
@@ -1645,19 +1925,21 @@ async function uploadHeroImageFile(slideNum) {
         const data = await res.json();
         if (res.ok && data.imageUrl) {
             document.getElementById(`heroImgUrl${slideNum}`).value = data.imageUrl;
-            document.getElementById(`heroPreview${slideNum}`).src = data.imageUrl;
+            if (preview) preview.src = data.imageUrl;
+            notify('تم رفع الصورة', 'success');
         } else {
-            alert(data.error || 'فشل رفع صورة الهيرو');
+            notify(data.error || 'فشل رفع صورة الهيرو', 'error');
         }
     } catch (err) {
         console.error(err);
-        alert('خطأ في الاتصال بالخادم أثناء رفع الصورة.');
+        notify('خطأ في الاتصال بالخادم أثناء رفع الصورة.', 'error');
+    } finally {
+        if (wrap) wrap.classList.remove('is-uploading');
+        fileInput.value = '';
     }
 }
 
-async function saveHeroSliderSettings() {
-    const feedback = document.getElementById('heroSliderFeedback');
-    
+async function saveHeroSliderSettings(btn) {
     const slide1 = {
         image:       document.getElementById('heroImgUrl1')?.value.trim() || './assets/images/hero_slide_1.jpg',
         title:       document.getElementById('heroTitle1')?.value.trim() || '',
@@ -1674,30 +1956,26 @@ async function saveHeroSliderSettings() {
 
     const hero_slides = JSON.stringify([slide1, slide2]);
 
-    try {
-        const res = await fetch(`${API_URL}/settings`, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${authToken}`
-            },
-            body: JSON.stringify({ hero_slides })
-        });
-        if (res.ok) {
-            if (feedback) {
-                feedback.className = 'feedback-msg success';
-                feedback.textContent = '✅ تم حفظ صور وإعدادات الواجهة بنجاح!';
+    await withBusy(btn, async () => {
+        try {
+            const res = await fetch(`${API_URL}/settings`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${authToken}`
+                },
+                body: JSON.stringify({ hero_slides })
+            });
+            if (res.ok) {
+                notify('تم حفظ صور وإعدادات الواجهة بنجاح!', 'success');
+            } else {
+                reportSaveFailure(res.status);
             }
-        } else {
-            const data = await res.json();
-            if (feedback) {
-                feedback.className = 'feedback-msg error';
-                feedback.textContent = data.error || 'حدث خطأ أثناء الحفظ.';
-            }
+        } catch (err) {
+            console.error(err);
+            notify('خطأ في الاتصال بالخادم.', 'error');
         }
-    } catch (err) {
-        console.error(err);
-    }
+    });
 }
 
 // ─── Store Features (Quick Stats) Controls (Admin) ────────────────────────────
@@ -1739,8 +2017,7 @@ function addFeatureRow(title = '', desc = '', icon = 'fa-star') {
 }
 window.addFeatureRow = addFeatureRow;
 
-async function saveStoreFeaturesSettings() {
-    const feedback = document.getElementById('featuresFeedback');
+async function saveStoreFeaturesSettings(btn) {
     const container = document.getElementById('featureRowsContainer');
     if (!container) return;
 
@@ -1756,32 +2033,33 @@ async function saveStoreFeaturesSettings() {
         }
     });
 
+    if (rows.length > 0 && featuresList.length === 0) {
+        notify('اكتب عنواناً واحداً على الأقل، أو احذف الصفوف لتعطيل السكشن.', 'error');
+        return;
+    }
+
     const store_features = JSON.stringify(featuresList);
 
-    try {
-        const res = await fetch(`${API_URL}/settings`, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${authToken}`
-            },
-            body: JSON.stringify({ store_features })
-        });
-        if (res.ok) {
-            if (feedback) {
-                feedback.className = 'feedback-msg success';
-                feedback.textContent = '✅ تم حفظ مميزات المتجر بنجاح!';
+    await withBusy(btn, async () => {
+        try {
+            const res = await fetch(`${API_URL}/settings`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${authToken}`
+                },
+                body: JSON.stringify({ store_features })
+            });
+            if (res.ok) {
+                notify('تم حفظ مميزات المتجر بنجاح!', 'success');
+            } else {
+                reportSaveFailure(res.status);
             }
-        } else {
-            const data = await res.json();
-            if (feedback) {
-                feedback.className = 'feedback-msg error';
-                feedback.textContent = data.error || 'حدث خطأ أثناء الحفظ.';
-            }
+        } catch (err) {
+            console.error(err);
+            notify('خطأ في الاتصال بالخادم.', 'error');
         }
-    } catch (err) {
-        console.error(err);
-    }
+    });
 }
 window.saveStoreFeaturesSettings = saveStoreFeaturesSettings;
 
@@ -1844,7 +2122,7 @@ function renderCommentsAdmin() {
                 <td style="max-width:350px; font-size:0.88rem; color:var(--color-text-secondary); line-height:1.5;">"${escapeHtml(c.comment)}"</td>
                 <td><small style="color:var(--color-text-muted);">${escapeHtml(c.dateText || 'الآن')}</small></td>
                 <td>
-                    <button class="btn btn-outline" style="padding:6px 12px; font-size:0.82rem; color:var(--color-danger); border-color:rgba(239,68,68,0.3);" onclick="deleteCommentAdmin(${c.id})">
+                    <button class="btn btn-outline" style="padding:6px 12px; font-size:0.82rem; color:var(--color-danger); border-color:rgba(239,68,68,0.3);" onclick="deleteCommentAdmin(${c.id}, this)">
                         <i class="fa-solid fa-trash"></i> حذف التعليق
                     </button>
                 </td>
@@ -1853,68 +2131,69 @@ function renderCommentsAdmin() {
     }).join('');
 }
 
-async function deleteCommentAdmin(id) {
-    if (!confirm('هل أنت متأكد من حذف هذا التعليق؟')) return;
+async function deleteCommentAdmin(id, triggerBtn) {
+    const ok = await confirmAction({
+        title: 'حذف تعليق',
+        message: 'هل أنت متأكد من حذف هذا التعليق؟',
+        confirmText: 'حذف',
+        danger: true
+    });
+    if (!ok) return;
+    setButtonBusy(triggerBtn, true);
     try {
         const res = await fetch(`${API_URL}/admin/reviews/${id}`, {
             method: 'DELETE',
             headers: { 'Authorization': `Bearer ${authToken}` }
         });
         if (res.ok) {
+            notify('تم حذف التعليق', 'success');
             fetchCommentsAdmin();
         } else {
+            setButtonBusy(triggerBtn, false);
             const data = await res.json();
-            alert(data.error || 'فشل حذف التعليق');
+            notify(data.error || 'فشل حذف التعليق', 'error');
         }
     } catch (err) {
         console.error(err);
-        alert('خطأ في الاتصال بالخادم.');
+        setButtonBusy(triggerBtn, false);
+        notify('خطأ في الاتصال بالخادم.', 'error');
     }
 }
 window.deleteCommentAdmin = deleteCommentAdmin;
 
-async function saveCommentsVisibilitySettings() {
+async function saveCommentsVisibilitySettings(btn) {
     const toggle = document.getElementById('toggleCommentsVisibility');
-    const feedback = document.getElementById('commentsVisibilityFeedback');
     if (!toggle) return;
 
     const reviews_enabled = toggle.checked ? 'true' : 'false';
 
-    if (feedback) {
-        feedback.className = 'feedback-msg';
-        feedback.style.color = 'var(--color-gold)';
-        feedback.textContent = 'جاري الحفظ...';
-    }
-
-    try {
-        const res = await fetch(`${API_URL}/settings`, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${authToken}`
-            },
-            body: JSON.stringify({ reviews_enabled })
-        });
-        if (res.ok) {
-            if (feedback) {
-                feedback.className = 'feedback-msg success';
-                feedback.textContent = '✅ تم تحديث حالة إظهار التعليقات في المتجر!';
-                setTimeout(() => { if (feedback) feedback.textContent = ''; }, 3000);
+    await withBusy(btn, async () => {
+        toggle.disabled = true;
+        try {
+            const res = await fetch(`${API_URL}/settings`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${authToken}`
+                },
+                body: JSON.stringify({ reviews_enabled })
+            });
+            if (res.ok) {
+                notify(reviews_enabled === 'true'
+                    ? 'تم إظهار التعليقات في المتجر.'
+                    : 'تم إخفاء التعليقات من المتجر.', 'success');
+            } else {
+                toggle.checked = reviews_enabled !== 'true';
+                reportSaveFailure(res.status);
             }
-        } else {
-            const data = await res.json();
-            if (feedback) {
-                feedback.className = 'feedback-msg error';
-                feedback.textContent = data.error || 'فشل الحفظ.';
-            }
+        } catch (err) {
+            console.error(err);
+            toggle.checked = reviews_enabled !== 'true';
+            notify('خطأ في الاتصال بالخادم.', 'error');
+        } finally {
+            toggle.disabled = false;
         }
-    } catch (err) {
-        console.error(err);
-        if (feedback) {
-            feedback.className = 'feedback-msg error';
-            feedback.textContent = 'خطأ في الاتصال بالخادم.';
-        }
-    }
+    });
 }
 window.saveCommentsVisibilitySettings = saveCommentsVisibilitySettings;
 

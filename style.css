@@ -254,8 +254,15 @@ img {
   z-index: 1000;
   width: 100%;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
-  background-color: #0a0a0a;
+  background-color: rgba(10, 10, 10, 0.85);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
   border-bottom: 1px solid rgba(212, 175, 55, 0.2);
+  transition: background-color var(--transition-normal), box-shadow var(--transition-normal);
+}
+.main-header.is-scrolled {
+  background-color: rgba(10, 10, 10, 0.95);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.75);
 }
 
 /* ══════════════════════════════════════════════════════
@@ -1351,7 +1358,8 @@ img {
   flex-direction: column;
   height: 100%;
   position: relative;
-  transition: all var(--transition-normal);
+  transition: transform var(--transition-normal), border-color var(--transition-normal),
+              box-shadow var(--transition-normal), background-color var(--transition-normal);
 }
 .product-card:hover {
   transform: translateY(-8px);
@@ -1542,6 +1550,28 @@ img {
   border-color: var(--color-gold);
   transform: scale(1.1);
   box-shadow: var(--shadow-gold);
+}
+.btn-buy-card.disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+/* Card meta line (sizes / colors count) */
+.product-card-meta {
+  font-size: 0.74rem;
+  color: var(--color-text-muted);
+  margin-bottom: 10px;
+}
+
+/* Out-of-stock product card */
+.product-badge.stockout {
+  background: rgba(255, 69, 58, 0.92);
+  color: #fff;
+}
+.product-card.out-of-stock .product-card-image img {
+  filter: grayscale(0.65);
+  opacity: 0.6;
 }
 
 /* Empty State / Not Found style */
@@ -1858,6 +1888,19 @@ img {
   font-size: 0.75rem;
   color: var(--color-text-muted);
   margin-bottom: 8px;
+}
+.cart-color-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.color-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1px solid var(--color-border);
+  display: inline-block;
+  vertical-align: middle;
 }
 .cart-item-controls {
   display: flex;
@@ -2270,6 +2313,90 @@ img {
   font-size: 1rem;
 }
 
+/* Quick view meta: SKU, stock, material */
+.qv-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.qv-sku {
+  font-size: 0.72rem;
+  letter-spacing: 0.6px;
+  direction: ltr;
+  color: var(--color-text-muted);
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+.qv-stock-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 3px 12px;
+  border-radius: 999px;
+}
+.qv-stock-badge.in {
+  color: var(--color-success);
+  background: rgba(46, 204, 113, 0.12);
+  border: 1px solid rgba(46, 204, 113, 0.35);
+}
+.qv-stock-badge.out {
+  color: var(--color-danger);
+  background: rgba(255, 69, 58, 0.1);
+  border: 1px solid rgba(255, 69, 58, 0.35);
+}
+.qv-material-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+  background: rgba(212, 175, 55, 0.06);
+  border: 1px solid rgba(212, 175, 55, 0.18);
+  border-radius: var(--radius-md);
+  padding: 8px 14px;
+  margin-bottom: 25px;
+}
+.qv-material-row i {
+  color: var(--color-gold);
+  font-size: 0.8rem;
+}
+.qv-material-row strong {
+  color: var(--color-text-primary);
+}
+.qv-count-label {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+/* Trust strip under the buy actions */
+.qv-trust-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px dashed var(--color-border);
+}
+.qv-trust-strip span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.78rem;
+  color: var(--color-text-secondary);
+}
+.qv-trust-strip i {
+  color: var(--color-gold);
+  font-size: 0.85rem;
+}
+#qvAddToCartBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}
+
 
 /* ==========================================================================
    CHECKOUT WIZARD DIALOG
@@ -2619,6 +2746,57 @@ img {
   font-size: 0.85rem;
   color: var(--color-text-secondary);
   padding-right: 22px; /* aligns with icon size */
+}
+
+/* Checkout step-3 items recap */
+.co-review-items {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 240px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.co-review-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+}
+.co-review-item img {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+  flex-shrink: 0;
+}
+.co-review-item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+}
+.co-review-item-name {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.co-review-item-specs {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+}
+.co-review-item-price {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--color-gold);
+  white-space: nowrap;
 }
 
 
@@ -4224,4 +4402,215 @@ body[data-theme="light"] .comment-date {
     letter-spacing: 0.5px;
     margin-right: 5px;
   }
+}
+
+/* ─── Toast notifications (non-blocking feedback) ───────────────────────── */
+.toast-host {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  z-index: 10000;
+  width: min(92vw, 440px);
+  pointer-events: none;
+}
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 13px 20px;
+  border-radius: var(--radius-full);
+  background: rgba(20, 20, 20, 0.94);
+  border: 1px solid var(--color-border);
+  border-inline-start: 3px solid var(--color-gold);
+  color: var(--color-text-primary);
+  font-family: var(--font-primary);
+  font-size: 0.92rem;
+  font-weight: 600;
+  text-align: start;
+  box-shadow: var(--shadow-lg), var(--shadow-gold);
+  backdrop-filter: blur(12px);
+  cursor: pointer;
+  pointer-events: auto;
+  opacity: 0;
+  transform: translateY(16px) scale(0.97);
+  transition: opacity 0.22s ease, transform 0.22s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+.toast.is-in { animation: toastIn 0.26s cubic-bezier(0.25, 0.8, 0.25, 1) both; }
+.toast.is-out { animation: toastOut 0.24s ease both; }
+@keyframes toastIn {
+  from { opacity: 0; transform: translateY(14px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes toastOut {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(10px) scale(0.97); }
+}
+.toast i { font-size: 1.05rem; color: var(--color-gold); flex-shrink: 0; }
+.toast--success { border-inline-start-color: var(--color-success); }
+.toast--success i { color: var(--color-success); }
+.toast--error { border-inline-start-color: var(--color-danger); }
+.toast--error i { color: var(--color-danger); }
+
+/* ─── Inline field errors ───────────────────────────────────────────────── */
+.field-error {
+  display: block;
+  min-height: 0;
+  margin-top: 6px;
+  color: var(--color-danger);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+.field-error:not(:empty) { min-height: 1.1em; }
+.input-error { border-color: var(--color-danger) !important; }
+@keyframes shakeField {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-5px); }
+  40% { transform: translateX(5px); }
+  60% { transform: translateX(-3px); }
+  80% { transform: translateX(3px); }
+}
+.is-shaking { animation: shakeField 0.32s ease-in-out; }
+
+/* ─── Reduced motion ────────────────────────────────────────────────────── */
+/* Trimming every transition to ~zero is what the OS accessibility setting
+   asks for; loaders keep spinning so a wait still reads as a wait. */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .fa-spin, .fa-circle-notch, [style*="animation: spin"], [style*="spin 1s"] {
+    animation-duration: 1s !important;
+    animation-iteration-count: infinite !important;
+  }
+}
+
+html[data-theme="light"] .toast,
+body[data-theme="light"] .toast {
+  background: rgba(255, 255, 255, 0.96);
+  color: var(--color-text-primary);
+  box-shadow: var(--shadow-md), 0 0 0 1px rgba(0, 0, 0, 0.04);
+}
+
+/* ─── Scroll-to-top ─────────────────────────────────────────────────────── */
+.scroll-top-btn {
+  position: fixed;
+  inset-inline-end: 22px;
+  bottom: 92px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border-radius: var(--radius-full);
+  background: rgba(20, 20, 20, 0.9);
+  border: 1px solid var(--color-gold);
+  color: var(--color-gold);
+  font-size: 1.05rem;
+  cursor: pointer;
+  z-index: 900;
+  box-shadow: var(--shadow-md), var(--shadow-gold);
+  backdrop-filter: blur(10px);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(14px) scale(0.9);
+  transition: opacity 0.25s ease, transform 0.25s cubic-bezier(0.25, 0.8, 0.25, 1), visibility 0.25s;
+}
+.scroll-top-btn.is-visible {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0) scale(1);
+}
+.scroll-top-btn:hover {
+  background: var(--color-gold);
+  color: #000;
+  transform: translateY(-3px) scale(1);
+}
+.scroll-top-btn:active { transform: translateY(0) scale(0.96); }
+.scroll-top-btn:focus-visible {
+  outline: 2px solid var(--color-gold);
+  outline-offset: 3px;
+}
+@media (max-width: 768px) {
+  .scroll-top-btn { width: 42px; height: 42px; bottom: 86px; inset-inline-end: 14px; }
+}
+
+/* ─── Skeleton loading placeholders ─────────────────────────────────────── */
+/* The blocks below copy the real card's row stack (category, two name lines,
+   rating, footer) so replacing skeletons with products moves nothing. */
+.skeleton-card { pointer-events: none; }
+.skeleton-img { width: 100%; aspect-ratio: 1 / 1; }
+.skeleton-body {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-grow: 1;
+}
+.skeleton-img, .skeleton-line, .skeleton-btn {
+  position: relative;
+  overflow: hidden;
+  background-color: var(--color-bg-tertiary);
+}
+.skeleton-line { height: 14px; border-radius: var(--radius-full); }
+.skeleton-line.sk-cat { height: 19px; width: 38%; }
+.skeleton-line.sk-name { height: 21px; }
+.skeleton-line.sk-rate { height: 19px; width: 26%; }
+.skeleton-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 56px;
+  margin-top: auto;
+}
+.skeleton-line.sk-price { height: 24px; width: 44%; }
+.skeleton-btn { width: 40px; height: 40px; border-radius: var(--radius-md); flex-shrink: 0; }
+.skeleton-img::after, .skeleton-line::after, .skeleton-btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, var(--color-border), transparent);
+  animation: skeletonShimmer 1.35s infinite;
+}
+@keyframes skeletonShimmer {
+  100% { transform: translateX(100%); }
+}
+
+/* One-time staggered entrance the moment skeletons give way to real cards.
+   Applied to the grid for ~1.2s only, so filtering never replays it. */
+.grid-revealed .product-card {
+  animation: cardReveal .38s cubic-bezier(.22, .68, .36, 1) both;
+}
+.grid-revealed .product-card:nth-child(2) { animation-delay: .045s; }
+.grid-revealed .product-card:nth-child(3) { animation-delay: .09s; }
+.grid-revealed .product-card:nth-child(4) { animation-delay: .135s; }
+.grid-revealed .product-card:nth-child(5) { animation-delay: .18s; }
+.grid-revealed .product-card:nth-child(6) { animation-delay: .225s; }
+@keyframes cardReveal {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .grid-revealed .product-card { animation: none; }
+}
+
+/* ─── Off-screen render skipping ────────────────────────────────────────── */
+/* These three sections sit below the fold on every viewport; letting the
+   browser skip their layout/paint until they approach shortens first paint. */
+.store-comments-section,
+.newsletter-section,
+.main-footer {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 700px;
 }

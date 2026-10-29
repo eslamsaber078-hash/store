@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0a0a0a">
   <title>Da Vinci Store | متجر الأزياء والأحذية الفاخرة</title>
   <meta name="description" content="اكتشف التشكيلة الحصرية من الملابس والأحذية والإكسسوارات الفاخرة في متجر Da Vinci Store. تجربة تسوق فريدة وجودة لا تضاهى.">
   
@@ -23,13 +24,16 @@
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://cdnjs.cloudflare.com">
+  <link rel="preconnect" href="https://res.cloudinary.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;800&family=Montserrat:wght@300;400;600;700&family=Tajawal:wght@300;400;500;700;900&display=swap" rel="stylesheet">
-  
-  <!-- Font Awesome Icons -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  
-  <!-- Custom Stylesheet -->
-  <link rel="stylesheet" href="./style.css?v=20260920_v3">
+
+  <!-- Custom Stylesheet (loaded first: it paints the whole above-the-fold view) -->
+  <link rel="stylesheet" href="./style.css?v=20261029_v5">
+
+  <!-- Font Awesome Icons: kept off the critical path so the CDN can never delay first paint -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" media="print" onload="this.media='all'">
+  <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"></noscript>
 
   <!-- Google Identity Services -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -192,7 +196,7 @@
       <!-- Clothing Category Card -->
       <a href="#shop-section" class="category-card" data-category="clothing">
         <div class="category-img-container">
-          <img src="./assets/images/cat_clothing.jpg" alt="الملابس الفاخرة">
+          <img src="./assets/images/cat_clothing.webp" alt="الملابس الفاخرة" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='./assets/images/cat_clothing.jpg'">
           <div class="category-overlay">
             <h3>الملابس الراقية</h3>
             <span class="category-link">تصفح الآن <i class="fa-solid fa-circle-arrow-left"></i></span>
@@ -202,7 +206,7 @@
       <!-- Shoes Category Card -->
       <a href="#shop-section" class="category-card" data-category="shoes">
         <div class="category-img-container">
-          <img src="./assets/images/cat_shoes.jpg" alt="الأحذية الممتازة">
+          <img src="./assets/images/cat_shoes.webp" alt="الأحذية الممتازة" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='./assets/images/cat_shoes.jpg'">
           <div class="category-overlay">
             <h3>أفخم الأحذية</h3>
             <span class="category-link">تصفح الآن <i class="fa-solid fa-circle-arrow-left"></i></span>
@@ -212,7 +216,7 @@
       <!-- Pants Category Card -->
       <a href="#shop-section" class="category-card" data-category="pants">
         <div class="category-img-container">
-          <img src="./assets/images/cat_pants.jpg" alt="البناطيل العصرية">
+          <img src="./assets/images/cat_pants.webp" alt="البناطيل العصرية" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='./assets/images/cat_pants.jpg'">
           <div class="category-overlay">
             <h3>البناطيل والجينز</h3>
             <span class="category-link">تصفح الآن <i class="fa-solid fa-circle-arrow-left"></i></span>
@@ -222,7 +226,7 @@
       <!-- Accessories Category Card -->
       <a href="#shop-section" class="category-card" data-category="accessories">
         <div class="category-img-container">
-          <img src="./assets/images/cat_accessories.jpg" alt="الإكسسوارات الفاخرة">
+          <img src="./assets/images/cat_accessories.webp" alt="الإكسسوارات الفاخرة" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='./assets/images/cat_accessories.jpg'">
           <div class="category-overlay">
             <h3>الساعات والإكسسوارات</h3>
             <span class="category-link">تصفح الآن <i class="fa-solid fa-circle-arrow-left"></i></span>
@@ -318,7 +322,14 @@
       <!-- Products Grid -->
       <section class="products-grid-wrapper">
         <div class="products-grid" id="productsGrid">
-          <!-- Products will be generated dynamically here by JS -->
+          <!-- Skeleton placeholders: reserve the grid height so the first paint
+               is never blank and landing products causes no layout jump. -->
+          <div class="product-card skeleton-card" aria-hidden="true"><div class="skeleton-img"></div><div class="skeleton-body"><span class="skeleton-line sk-cat"></span><span class="skeleton-line sk-name" style="width:86%"></span><span class="skeleton-line sk-name" style="width:62%"></span><span class="skeleton-line sk-rate"></span><div class="skeleton-footer"><span class="skeleton-line sk-price"></span><span class="skeleton-btn"></span></div></div></div>
+          <div class="product-card skeleton-card" aria-hidden="true"><div class="skeleton-img"></div><div class="skeleton-body"><span class="skeleton-line sk-cat"></span><span class="skeleton-line sk-name" style="width:86%"></span><span class="skeleton-line sk-name" style="width:62%"></span><span class="skeleton-line sk-rate"></span><div class="skeleton-footer"><span class="skeleton-line sk-price"></span><span class="skeleton-btn"></span></div></div></div>
+          <div class="product-card skeleton-card" aria-hidden="true"><div class="skeleton-img"></div><div class="skeleton-body"><span class="skeleton-line sk-cat"></span><span class="skeleton-line sk-name" style="width:86%"></span><span class="skeleton-line sk-name" style="width:62%"></span><span class="skeleton-line sk-rate"></span><div class="skeleton-footer"><span class="skeleton-line sk-price"></span><span class="skeleton-btn"></span></div></div></div>
+          <div class="product-card skeleton-card" aria-hidden="true"><div class="skeleton-img"></div><div class="skeleton-body"><span class="skeleton-line sk-cat"></span><span class="skeleton-line sk-name" style="width:86%"></span><span class="skeleton-line sk-name" style="width:62%"></span><span class="skeleton-line sk-rate"></span><div class="skeleton-footer"><span class="skeleton-line sk-price"></span><span class="skeleton-btn"></span></div></div></div>
+          <div class="product-card skeleton-card" aria-hidden="true"><div class="skeleton-img"></div><div class="skeleton-body"><span class="skeleton-line sk-cat"></span><span class="skeleton-line sk-name" style="width:86%"></span><span class="skeleton-line sk-name" style="width:62%"></span><span class="skeleton-line sk-rate"></span><div class="skeleton-footer"><span class="skeleton-line sk-price"></span><span class="skeleton-btn"></span></div></div></div>
+          <div class="product-card skeleton-card" aria-hidden="true"><div class="skeleton-img"></div><div class="skeleton-body"><span class="skeleton-line sk-cat"></span><span class="skeleton-line sk-name" style="width:86%"></span><span class="skeleton-line sk-name" style="width:62%"></span><span class="skeleton-line sk-rate"></span><div class="skeleton-footer"><span class="skeleton-line sk-price"></span><span class="skeleton-btn"></span></div></div></div>
         </div>
 
         <!-- No products found state -->
@@ -327,6 +338,12 @@
           <h3>عذراً، لم نجد أي نتائج متوافقة</h3>
           <p>يرجى تعديل خيارات التصفية أو البحث عن كلمة أخرى.</p>
           <button id="resetFiltersBtnEmpty" class="btn btn-primary">إعادة تعيين جميع الفلاتر</button>
+        </div>
+        <div class="no-products-found" id="productsLoadError" style="display: none;">
+          <div class="empty-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
+          <h3>تعذر تحميل المنتجات حالياً</h3>
+          <p>يبدو أن هناك مشكلة في الاتصال، أعد المحاولة.</p>
+          <button id="retryProductsBtn" class="btn btn-primary">إعادة المحاولة</button>
         </div>
       </section>
 
@@ -615,17 +632,7 @@
           <div style="display: flex; justify-content: center; margin-bottom: 15px;">
             <div id="googleSignInButton"></div>
           </div>
-          
-          <!-- Mock Fallback Testing button for Localhost -->
-          <div style="margin-top: 25px; border-top: 1px solid var(--color-border); padding-top: 20px;">
-            <button id="mockGoogleLoginBtn" class="btn btn-outline w-100" style="font-size: 0.85rem; padding: 12px;">
-              <i class="fa-brands fa-google" style="margin-left: 8px; color: #EA4335;"></i> الدخول السريع بحساب جوجل (تجريبي)
-            </button>
-            <small style="display: block; color: var(--color-text-muted); font-size: 0.7rem; margin-top: 8px; line-height: 1.4;">
-              * اضغط للدخول مباشرة بحساب Google تجريبي دون الحاجة لتهيئة مفاتيح المطورين (Local Developer Fallback).
-            </small>
-          </div>
-          
+
           <div id="userLoginError" class="auth-error mt-3" style="color:var(--color-danger); font-size: 0.85rem;"></div>
         </div>
         
@@ -675,6 +682,11 @@
             <span class="reviews-count-text" id="qvReviewsText">(45 تقييم من العملاء)</span>
           </div>
 
+          <div class="qv-meta-row">
+            <span class="qv-sku" id="qvSku">SKU: DV-0</span>
+            <span class="qv-stock-badge in" id="qvStock">متوفر</span>
+          </div>
+
           <div class="qv-price-wrapper">
             <span class="current-price" id="qvPrice">0 ج.م</span>
             <span class="old-price" id="qvOldPrice">0 ج.م</span>
@@ -682,9 +694,15 @@
 
           <p class="qv-desc" id="qvDescription">شرح مميزات هذا المنتج ومواده وصناعته بالتفصيل المريح والجاذب.</p>
 
+          <div class="qv-material-row" id="qvMaterialRow" style="display: none;">
+            <i class="fa-solid fa-layer-group"></i>
+            <span>الخامة:</span>
+            <strong id="qvMaterial">-</strong>
+          </div>
+
           <!-- Color Swatches Selection -->
           <div class="qv-spec-group">
-            <h4 class="spec-label">اللون المختار: <span class="selected-spec-val" id="qvSelectedColorText">أسود ذهبي</span></h4>
+            <h4 class="spec-label">اللون المختار: <span class="selected-spec-val" id="qvSelectedColorText">أسود ذهبي</span> <span class="qv-count-label" id="qvColorsCount"></span></h4>
             <div class="color-options-swatches" id="qvColorsContainer">
               <!-- JS color buttons -->
             </div>
@@ -692,7 +710,7 @@
 
           <!-- Size Options Selection -->
           <div class="qv-spec-group">
-            <h4 class="spec-label">المقاس المختار: <span class="selected-spec-val" id="qvSelectedSizeText">غير محدد</span></h4>
+            <h4 class="spec-label">المقاس المختار: <span class="selected-spec-val" id="qvSelectedSizeText">غير محدد</span> <span class="qv-count-label" id="qvSizesCount"></span></h4>
             <div class="size-options-swatches" id="qvSizesContainer">
               <!-- JS size buttons -->
             </div>
@@ -706,6 +724,12 @@
               <button class="qty-btn" id="qvQtyPlus"><i class="fa-solid fa-plus"></i></button>
             </div>
             <button id="qvAddToCartBtn" class="btn btn-primary flex-grow-1"><i class="fa-solid fa-bag-shopping"></i> إضافة لحقيبة التسوق</button>
+          </div>
+
+          <div class="qv-trust-strip">
+            <span><i class="fa-solid fa-truck-fast"></i> شحن مجاني</span>
+            <span><i class="fa-solid fa-rotate-left"></i> استرجاع خلال 14 يوم</span>
+            <span><i class="fa-solid fa-hand-holding-dollar"></i> الدفع عند الاستلام</span>
           </div>
         </div>
       </div>
@@ -845,6 +869,12 @@
             
             <div class="checkout-final-summary">
               <div class="summary-box">
+                <h4><i class="fa-solid fa-bag-shopping"></i> المنتجات المطلوبة:</h4>
+                <div class="co-review-items" id="coReviewItems">
+                  <!-- JS renders items recap -->
+                </div>
+              </div>
+              <div class="summary-box">
                 <h4><i class="fa-solid fa-map-pin"></i> عنوان التوصيل:</h4>
                 <p id="summaryAddressText">اسم العميل، العنوان، المحافظة</p>
               </div>
@@ -920,10 +950,15 @@
   <!-- Search Suggestions Dropdown — appended to body to avoid header overflow/layout issues -->
   <div class="search-suggestions" id="searchSuggestions" role="listbox" aria-label="اقتراحات البحث"></div>
 
+  <noscript><style>.skeleton-card { display: none !important; }</style></noscript>
+
+  <button type="button" class="scroll-top-btn" id="scrollTopBtn" aria-label="العودة إلى أعلى الصفحة" tabindex="-1">
+    <i class="fa-solid fa-arrow-up" aria-hidden="true"></i>
+  </button>
+
 
 
   <!-- Loaded Scripts -->
-  <script src="./products.js"></script>
-  <script src="./main.js?v=20260920_v3"></script>
+  <script src="./main.js?v=20261029_v18"></script>
 </body>
 </html>

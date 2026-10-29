@@ -12,10 +12,11 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;800&family=Montserrat:wght@300;400;600;700&family=Tajawal:wght@300;400;500;700;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  
-  <link rel="stylesheet" href="./style.css">
-  <link rel="stylesheet" href="./admin.css?v=20260920_v3">
+
+  <link rel="stylesheet" href="./style.css?v=20261029_v4">
+  <link rel="stylesheet" href="./admin.css?v=20261029_v3">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" media="print" onload="this.media='all'">
+  <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"></noscript>
   <style>
     html.user-authenticated #loginScreen { display: none !important; }
     html.user-authenticated #adminDashboard { display: flex !important; }
@@ -195,10 +196,9 @@
             </div>
           </div>
           <div>
-            <button type="button" class="btn btn-primary" onclick="saveThemeColorSettings()">
+            <button type="button" class="btn btn-primary" onclick="saveThemeColorSettings(this)">
               حفظ مظهر ونمط الموقع <i class="fa-solid fa-save"></i>
             </button>
-            <span id="themeColorFeedback" class="feedback-msg"></span>
           </div>
         </div>
 
@@ -260,10 +260,9 @@
           </div>
 
           <div class="mt-4">
-            <button type="button" class="btn btn-primary" onclick="saveHeroSliderSettings()">
+            <button type="button" class="btn btn-primary" onclick="saveHeroSliderSettings(this)">
               حفظ صور وإعدادات الواجهة <i class="fa-solid fa-save"></i>
             </button>
-            <span id="heroSliderFeedback" class="feedback-msg"></span>
           </div>
         </div>
 
@@ -289,13 +288,12 @@
             <small style="color:var(--color-text-muted);font-size:0.78rem;margin-top:6px;display:block;">ستظهر هذه الإعلانات متتالية ومتحركة في الشريط العلوي للموقع.</small>
           </div>
           <div class="mt-3">
-            <button type="button" class="btn btn-primary" onclick="saveAnnouncementSettings()">
+            <button type="button" class="btn btn-primary" onclick="saveAnnouncementSettings(this)">
               حفظ الإعلانات <i class="fa-solid fa-save"></i>
             </button>
-            <button type="button" class="btn btn-outline" style="margin-right:10px; color:var(--color-danger); border-color:rgba(239,68,68,0.3);" onclick="clearAnnouncement()">
+            <button type="button" class="btn btn-outline" style="margin-right:10px; color:var(--color-danger); border-color:rgba(239,68,68,0.3);" onclick="clearAnnouncement(this)">
               حذف الكل <i class="fa-solid fa-trash"></i>
             </button>
-            <span id="announcementFeedback" class="feedback-msg"></span>
           </div>
         </div>
 
@@ -312,10 +310,9 @@
             <!-- Dynamic feature rows populated via JS -->
           </div>
           <div class="mt-4">
-            <button type="button" class="btn btn-primary" onclick="saveStoreFeaturesSettings()">
+            <button type="button" class="btn btn-primary" onclick="saveStoreFeaturesSettings(this)">
               حفظ مميزات المتجر <i class="fa-solid fa-save"></i>
             </button>
-            <span id="featuresFeedback" class="feedback-msg"></span>
           </div>
         </div>
 
@@ -348,7 +345,6 @@
             </div>
             <div class="mt-4">
               <button type="submit" class="btn btn-primary">حفظ إعدادات الدفع <i class="fa-solid fa-save"></i></button>
-              <span id="settingsFeedback" class="feedback-msg"></span>
             </div>
           </form>
         </div>
@@ -458,10 +454,9 @@
                 <span class="checkbox-checkmark"></span>
                 تفعيل ظهور التعليقات في المتجر
               </label>
-              <button type="button" class="btn btn-primary" id="saveCommentsVisibilityBtn" onclick="saveCommentsVisibilitySettings()">
+              <button type="button" class="btn btn-primary" id="saveCommentsVisibilityBtn" onclick="saveCommentsVisibilitySettings(this)">
                 حفظ التغييرات <i class="fa-solid fa-floppy-disk"></i>
               </button>
-              <span id="commentsVisibilityFeedback" class="feedback-msg"></span>
             </div>
           </div>
         </div>
@@ -592,6 +587,10 @@
             <label>المقاسات (مفصولة بفاصلة)</label>
             <input type="text" id="prodSizes" placeholder="S, M, L, XL أو 40, 41, 42">
           </div>
+          <div class="form-group col-12">
+            <label>الخامة / المادة <span style="font-size:0.75rem; color: var(--color-text-muted);">(اختياري — مثال: جلد طبيعي، قطن 100%)</span></label>
+            <input type="text" id="prodMaterial" placeholder="جلد طبيعي" maxlength="120">
+          </div>
           <!-- Color 1 Picker -->
           <div class="form-group col-12">
             <label>اللون الأول</label>
@@ -719,6 +718,6 @@
 
   <!-- HTML2PDF CDN library -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-  <script src="./admin.js?v=20260920_v3"></script>
+  <script src="./admin.js?v=20261029_v9"></script>
 </body>
 </html>

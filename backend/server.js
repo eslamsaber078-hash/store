@@ -171,7 +171,9 @@ const orderLimiter = rateLimit({
 // ─── Middleware ────────────────────────────────────────────────────────────
 app.use(compression({
     threshold: 1024,   // compress responses larger than 1 KB
-    level: 6           // balanced ratio between speed and size
+    level: 6,          // balanced ratio between speed and size
+    // Gzip buffering would hold SSE messages back instead of pushing them live
+    filter: (req, res) => req.path === '/api/events' ? false : compression.filter(req, res)
 }));
 app.use(helmet({
     contentSecurityPolicy: false,
@@ -201,7 +203,6 @@ app.use('/style.css', express.static(path.join(__dirname, '../style.css'), { max
 app.use('/admin.css', express.static(path.join(__dirname, '../admin.css'), { maxAge: 0 }));
 app.use('/main.js', express.static(path.join(__dirname, '../main.js'), { maxAge: 0 }));
 app.use('/admin.js', express.static(path.join(__dirname, '../admin.js'), { maxAge: 0 }));
-app.use('/products.js', express.static(path.join(__dirname, '../products.js'), { maxAge: 0 }));
 
 // ─── Global Anti-Cache Middleware ──────────────────────────────────────────
 // HTML pages and API responses must never be cached by browsers/proxies,
@@ -440,7 +441,49 @@ function cacheInvalidate(prefix) {
     for (const key of readCache.keys()) {
         if (key.startsWith(prefix)) readCache.delete(key);
     }
+    broadcastChange(prefix);
 }
+
+// ─── Live updates (Server-Sent Events) ───────────────────────────────────
+// Storefront tabs keep an open stream; whenever an admin write invalidates a
+// cached collection the affected topic is pushed, so visitors see the change
+// without reloading. Only public collection names travel on this channel.
+const sseClients = new Set();
+
+function broadcastChange(topic) {
+    const message = `event: update\ndata: {"topic":"${topic}"}\n\n`;
+    for (const client of sseClients) {
+        try {
+            client.write(message);
+        } catch (e) {
+            sseClients.delete(client);
+        }
+    }
+}
+
+app.get('/api/events', (req, res) => {
+    res.set({
+        'Content-Type': 'text/event-stream; charset=utf-8',
+        'Cache-Control': 'no-store, no-cache, must-revalidate',
+        'Connection': 'keep-alive',
+        'X-Accel-Buffering': 'no'
+    });
+    res.flushHeaders();
+    res.write('retry: 3000\n\n');
+    sseClients.add(res);
+    req.on('close', () => sseClients.delete(res));
+});
+
+// Keeps idle connections (and proxy buffers) alive.
+setInterval(() => {
+    for (const client of sseClients) {
+        try {
+            client.write(': ping\n\n');
+        } catch (e) {
+            sseClients.delete(client);
+        }
+    }
+}, 25000).unref();
 
 function parseJsonArray(value, fallback) {
     if (Array.isArray(value)) return value;
@@ -479,6 +522,7 @@ app.get('/api/products', (req, res) => {
                 description:  r.description  || '',
                 sizes:        parseJsonArray(r.sizes, []),
                 colors:       parseJsonArray(r.colors, []),
+                material:     r.material     || '',
                 inStock:      r.in_stock === 1 || r.in_stock === true || r.in_stock === 'true' || r.in_stock === null || r.in_stock === undefined,
                 featured:     r.featured === 1 || r.featured === true || r.featured === 'true'
             };
@@ -489,7 +533,7 @@ app.get('/api/products', (req, res) => {
 });
 
 app.post('/api/products', authenticateToken, isAdmin, upload.array('imagesFiles', 10), async (req, res) => {
-    const { name, category, categoryName, price, oldPrice, description, sizes, colors, inStock, featured } = req.body;
+    const { name, category, categoryName, price, oldPrice, description, sizes, colors, material, inStock, featured } = req.body;
 
     if (!name || !String(name).trim()) {
         return res.status(400).json({ error: "اسم المنتج مطلوب" });
@@ -520,8 +564,8 @@ app.post('/api/products', authenticateToken, isAdmin, upload.array('imagesFiles'
     const mainImage = finalImages[0] || '';
     
     db.run(`INSERT INTO products 
-        (name, category, category_name, price, old_price, rating, reviews_count, image, images, description, sizes, colors, in_stock, featured)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
+        (name, category, category_name, price, old_price, rating, reviews_count, image, images, description, sizes, colors, material, in_stock, featured)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
         String(name).trim(), 
         category, 
         categoryName, 
@@ -534,6 +578,7 @@ app.post('/api/products', authenticateToken, isAdmin, upload.array('imagesFiles'
         description, 
         sizesJson,
         colorsJson,
+        String(material || '').trim().slice(0, 120),
         inStock === 'true' || inStock === true || inStock === undefined || inStock === null ? 1 : 0, 
         featured === 'true' || featured === true ? 1 : 0
     ], function(err) {
@@ -544,7 +589,7 @@ app.post('/api/products', authenticateToken, isAdmin, upload.array('imagesFiles'
 });
 
 app.put('/api/products/:id', authenticateToken, isAdmin, upload.array('imagesFiles', 10), async (req, res) => {
-    const { name, category, categoryName, price, oldPrice, description, sizes, colors, inStock, featured, existingImages } = req.body;
+    const { name, category, categoryName, price, oldPrice, description, sizes, colors, material, inStock, featured, existingImages } = req.body;
     const productId = parseInt(req.params.id, 10);
     if (!Number.isInteger(productId)) {
         return res.status(400).json({ error: "معرّف المنتج غير صالح" });
@@ -588,7 +633,7 @@ app.put('/api/products/:id', authenticateToken, isAdmin, upload.array('imagesFil
     const mainImage = finalImages[0] || '';
     
     db.run(`UPDATE products SET 
-        name = ?, category = ?, category_name = ?, price = ?, old_price = ?, image = ?, images = ?, description = ?, sizes = ?, colors = ?, in_stock = ?, featured = ?
+        name = ?, category = ?, category_name = ?, price = ?, old_price = ?, image = ?, images = ?, description = ?, sizes = ?, colors = ?, material = ?, in_stock = ?, featured = ?
         WHERE id = ?`, [
         String(name).trim(), 
         category, 
@@ -600,6 +645,7 @@ app.put('/api/products/:id', authenticateToken, isAdmin, upload.array('imagesFil
         description, 
         sizesJson,
         colorsJson,
+        String(material || '').trim().slice(0, 120),
         inStock === 'true' || inStock === true || inStock === undefined || inStock === null ? 1 : 0, 
         featured === 'true' || featured === true ? 1 : 0, 
         productId
@@ -795,6 +841,8 @@ app.put('/api/settings', authenticateToken, isAdmin, async (req, res) => {
         });
         await Promise.all(updates);
         cacheInvalidate('settings');
+        // /api/reviews embeds the reviews_enabled flag, so its cache has to go too
+        if (req.body.reviews_enabled !== undefined) cacheInvalidate('reviews');
         res.json({ message: 'Settings updated successfully' });
     } catch (err) {
         console.error('[DB]', err.message); res.status(500).json({ error: "خطأ في الخادم" });
@@ -956,33 +1004,44 @@ app.get('/api/reviews', (req, res) => {
 });
 
 app.post('/api/reviews', reviewLimiter, (req, res) => {
-    const { name, rating, comment } = req.body;
+    const name = String(req.body.name ?? '').trim();
+    const comment = String(req.body.comment ?? '').trim();
     if (!name || !comment) {
         return res.status(400).json({ error: 'يرجى كتابة الاسم والتعليق' });
     }
-    const rateVal = Math.max(1, Math.min(5, parseFloat(rating) || 5));
-    const nowIso = new Date().toISOString();
-    db.run(
-        "INSERT INTO reviews (name, rating, comment, date_text, verified, status, created_at) VALUES (?, ?, ?, 'الآن', 1, 'approved', ?)",
-        [name.trim(), rateVal, comment.trim(), nowIso],
-        function(err) {
-            if (err) { console.error('[DB] Insert review:', err.message); return res.status(500).json({ error: 'خطأ في الخادم' }); }
-            cacheInvalidate('reviews');
-            res.json({
-                success: true,
-                id: this.lastID,
-                review: {
-                    id: this.lastID,
-                    name: name.trim(),
-                    rating: rateVal,
-                    comment: comment.trim(),
-                    dateText: 'الآن',
-                    verified: true
-                },
-                message: 'شكراً لك! تم إضافة رأيك وتجربتك بنجاح.'
-            });
+    if (name.length > 60 || comment.length > 1000) {
+        return res.status(400).json({ error: 'الاسم أو التعليق أطول من المسموح' });
+    }
+
+    db.get("SELECT value FROM settings WHERE key = 'reviews_enabled'", [], (err, setRow) => {
+        if (!err && setRow && setRow.value === 'false') {
+            return res.status(403).json({ error: 'التعليقات متوقفة حالياً من إدارة المتجر' });
         }
-    );
+
+        const rateVal = Math.max(1, Math.min(5, parseFloat(req.body.rating) || 5));
+        const nowIso = new Date().toISOString();
+        db.run(
+            "INSERT INTO reviews (name, rating, comment, date_text, verified, status, created_at) VALUES (?, ?, ?, 'الآن', 1, 'approved', ?)",
+            [name, rateVal, comment, nowIso],
+            function(err2) {
+                if (err2) { console.error('[DB] Insert review:', err2.message); return res.status(500).json({ error: 'خطأ في الخادم' }); }
+                cacheInvalidate('reviews');
+                res.json({
+                    success: true,
+                    id: this.lastID,
+                    review: {
+                        id: this.lastID,
+                        name,
+                        rating: rateVal,
+                        comment,
+                        dateText: 'الآن',
+                        verified: true
+                    },
+                    message: 'شكراً لك! تم إضافة رأيك وتجربتك بنجاح.'
+                });
+            }
+        );
+    });
 });
 
 // Admin Reviews CRUD
@@ -1109,8 +1168,8 @@ app.post('/api/orders', orderLimiter, (req, res) => {
                     name: product.name || String(item.name || 'منتج'),
                     quantity: parseInt(item.quantity, 10),
                     price: Number(product.price) || 0,
-                    size: String(item.size || 'N/A').slice(0, 50),
-                    color: String(item.color || 'افتراضي').slice(0, 50)
+                    size: (typeof item.size === 'string' ? item.size : 'N/A').trim().slice(0, 50) || 'N/A',
+                    color: (typeof item.color === 'string' ? item.color : 'افتراضي').trim().slice(0, 50) || 'افتراضي'
                 });
             }
 
@@ -1124,11 +1183,12 @@ app.post('/api/orders', orderLimiter, (req, res) => {
 
             const initialStatus = payment_method === 'cod' ? 'pending' : 'pending_payment_verification';
             const orderNumber = 'VL-' + Math.floor(10000 + Math.random() * 90000);
+            const clean = (v, max) => (typeof v === 'string' || typeof v === 'number') ? String(v).trim().slice(0, max) : null;
 
             db.run(`INSERT INTO orders 
                 (order_number, customer_name, phone, address, governorate, city, payment_method, subtotal, discount, total, status, payment_sender, payment_reference)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, 
-                [orderNumber, String(customer_name).trim(), String(phone).trim(), String(address).trim(), governorate || null, city || null, String(payment_method).trim(), subtotal, discount, total, initialStatus, payment_sender || null, payment_reference || null], 
+                [orderNumber, clean(customer_name, 120), clean(phone, 30), clean(address, 300), clean(governorate, 100), clean(city, 100), clean(payment_method, 30), subtotal, discount, total, initialStatus, clean(payment_sender, 100), clean(payment_reference, 100)], 
                 function(insErr) {
                     if (insErr) { console.error('[DB]', insErr.message); return res.status(500).json({ error: "خطأ في الخادم" }); }
 
@@ -1148,6 +1208,7 @@ app.post('/api/orders', orderLimiter, (req, res) => {
 
                     Promise.all(itemPromises)
                         .then(() => {
+                            broadcastChange('orders');
                             res.json({ orderNumber, message: "Order placed successfully" });
                         })
                         .catch(itemErr => {
@@ -1191,6 +1252,7 @@ app.put('/api/orders/:id/status', authenticateToken, isAdmin, (req, res) => {
     }
     db.run("UPDATE orders SET status = ? WHERE id = ?", [status, orderId], function(err) {
         if (err) { console.error('[DB]', err.message); return res.status(500).json({ error: "خطأ في الخادم" }); }
+        broadcastChange('orders');
         res.json({ message: "Order status updated successfully" });
     });
 });
@@ -1205,6 +1267,7 @@ app.delete('/api/orders/:id', authenticateToken, isAdmin, (req, res) => {
         
         db.run("DELETE FROM orders WHERE id = ?", [orderId], function(err) {
             if (err) { console.error('[DB]', err.message); return res.status(500).json({ error: "خطأ في الخادم" }); }
+            broadcastChange('orders');
             res.json({ message: "Order deleted successfully" });
         });
     });
