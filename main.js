@@ -7,6 +7,24 @@ document.addEventListener("DOMContentLoaded", () => {
   let products = [];
   let userToken = localStorage.getItem("userToken") || null;
 
+  // Stand-in shown when a product photo is missing, so the spot never looks empty
+  window.VOGUE_IMAGE_PLACEHOLDER = "data:image/svg+xml;utf8," + encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="600" height="600"><rect width="600" height="600" fill="#231f2b"/><g fill="none" stroke="#564a6b" stroke-width="16"><rect x="160" y="170" width="280" height="260" rx="20"/><circle cx="240" cy="260" r="30"/><path d="M200 400l90-90 60 60 90-90"/></g></svg>'
+  );
+  // If a .webp copy is missing on disk, quietly retry the original .jpg before
+  // falling back to the placeholder (capture phase runs before inline onerror)
+  document.addEventListener("error", (e) => {
+    const t = e.target;
+    if (!t || t.tagName !== "IMG") return;
+    const src = t.currentSrc || t.src || "";
+    if (/\.webp($|\?)/i.test(src)) {
+      const jpg = src.replace(/\.webp($|\?)/i, ".jpg$1");
+      t.src = jpg;
+      e.stopPropagation();
+      e.preventDefault();
+    }
+  }, true);
+
   // ─── WHOSE BASKET IS THIS? ───────────────────────────────────────────────
   // The cart and the wishlist belong to the person looking at the screen:
   // one storage bucket per signed-in account, one for guests. Everything lives
@@ -1137,7 +1155,7 @@ document.addEventListener("DOMContentLoaded", () => {
           </button>
           
           <div class="product-card-image">
-            <img src="${product.image}" alt="${product.name}" loading="lazy" decoding="async">
+            <img src="${product.image}" alt="${product.name}" loading="lazy" decoding="async" onerror="this.onerror=null;this.src=window.VOGUE_IMAGE_PLACEHOLDER">
             <div class="quick-view-overlay">
               <button class="btn-quickview" onclick="window.vogueOpenQuickView('${product.id}')">
                 <i class="fa-solid fa-eye"></i> عرض سريع
@@ -1467,6 +1485,10 @@ document.addEventListener("DOMContentLoaded", () => {
     
     // Build images array (use images[] first, fallback to image)
     const allImages = (prod.images && prod.images.length > 0) ? prod.images : (prod.image ? [prod.image] : []);
+    elements.qvMainImage.onerror = () => {
+      elements.qvMainImage.onerror = null;
+      elements.qvMainImage.src = window.VOGUE_IMAGE_PLACEHOLDER;
+    };
     elements.qvMainImage.src = allImages[0] || '';
     elements.qvMainImage.alt = prod.name;
     elements.qvDescription.innerText = prod.description;
@@ -1478,6 +1500,7 @@ document.addEventListener("DOMContentLoaded", () => {
       thumbsContainer.innerHTML = allImages.map((img, i) => `
         <img src="${img}" alt="${prod.name} - صورة ${i+1}"
              class="qv-thumb ${i === 0 ? 'active' : ''}"
+             onerror="this.onerror=null;this.src=window.VOGUE_IMAGE_PLACEHOLDER"
              onclick="document.getElementById('qvMainImage').src='${img}';document.querySelectorAll('.qv-thumb').forEach(t=>t.classList.remove('active'));this.classList.add('active');"
         >
       `).join('');
